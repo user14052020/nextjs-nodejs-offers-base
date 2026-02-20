@@ -1,0 +1,77 @@
+services:
+  mongo:
+    image: mongo:6
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  mongo-init-replica:
+    image: mongo:6
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_started
+    command:
+      [
+        "sh",
+        "-c",
+        "until mongosh --host mongo:27017 --quiet --eval \"db.adminCommand({ ping: 1 }).ok\" | grep 1; do sleep 1; done; mongosh --host mongo:27017 --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}) }\""
+      ]
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  api:
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongo:27017/offers-base?replicaSet=rs0
+      - ELASTICSEARCH_NODE=http://elasticsearch:9200
+      - JWT_SECRET=change-me
+      - JWT_EXPIRES_IN=12h
+    depends_on:
+      mongo-init-replica:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  mongo_data:
+  redis_data:
+  es_data:
