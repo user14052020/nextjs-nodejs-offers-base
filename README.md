@@ -4,6 +4,14 @@
 
 ## Быстрый старт (Docker)
 
+1. Создайте локальный env-файл:
+
+```bash
+cp .env.example .env
+```
+
+2. Запустите проект:
+
 ```bash
 docker compose up --build
 ```
@@ -12,7 +20,7 @@ docker compose up --build
 - API: http://localhost:3001
 - Healthcheck: http://localhost:3001/health
 
-По умолчанию при первой инициализации базы создается пользователь `admin/admin`.
+При первой инициализации базы создается админ из переменных `ADMIN_USERNAME` и `ADMIN_PASSWORD` в `.env`.
 
 ## Данные и тома Docker
 
@@ -63,16 +71,18 @@ docker compose up --build
 bash scripts/backup-db.sh
 ```
 
+Скрипт автоматически читает значения из корневого `.env`.
+
 По умолчанию скрипт использует:
 - `API_URL=http://localhost:3001`
-- `BACKUP_USERNAME=admin`
-- `BACKUP_PASSWORD=admin`
+- `BACKUP_USERNAME=значение ADMIN_USERNAME`
+- `BACKUP_PASSWORD=значение ADMIN_PASSWORD`
 - `BACKUP_OUTPUT_DIR=./backups`
 
 Пример с переопределением:
 
 ```bash
-API_URL=http://localhost:3001 BACKUP_USERNAME=admin BACKUP_PASSWORD=admin BACKUP_OUTPUT_DIR=./my-backups bash scripts/backup-db.sh
+API_URL=http://localhost:3001 BACKUP_USERNAME=admin BACKUP_PASSWORD=supersecret BACKUP_OUTPUT_DIR=./my-backups bash scripts/backup-db.sh
 ```
 
 ### Восстановление из консоли
@@ -83,16 +93,18 @@ API_URL=http://localhost:3001 BACKUP_USERNAME=admin BACKUP_PASSWORD=admin BACKUP
 RESTORE_CONFIRM=YES bash scripts/restore-db.sh ./backups/offers-base-backup-20260220-100000.json.gz
 ```
 
+Скрипт автоматически читает значения из корневого `.env`.
+
 По умолчанию скрипт использует:
 - `API_URL=http://localhost:3001`
-- `BACKUP_USERNAME=admin`
-- `BACKUP_PASSWORD=admin`
+- `BACKUP_USERNAME=значение ADMIN_USERNAME`
+- `BACKUP_PASSWORD=значение ADMIN_PASSWORD`
 - `RESTORE_CONFIRM=YES` (обязательно, иначе команда не запустится)
 
 Пример с переопределением:
 
 ```bash
-API_URL=http://localhost:3001 BACKUP_USERNAME=admin BACKUP_PASSWORD=admin RESTORE_CONFIRM=YES bash scripts/restore-db.sh ./my-backups/backup.json.gz
+API_URL=http://localhost:3001 BACKUP_USERNAME=admin BACKUP_PASSWORD=supersecret RESTORE_CONFIRM=YES bash scripts/restore-db.sh ./my-backups/backup.json.gz
 ```
 
 ## Локальная разработка
@@ -111,11 +123,18 @@ npm run dev
 
 ## Переменные окружения
 
-API (apps/api/.env):
+Используется корневой файл `.env` (см. `.env.example`):
+
+- `WEB_PORT`
+- `API_PORT`
+- `MONGO_PORT`
+- `REDIS_PORT`
+- `ELASTICSEARCH_PORT`
 - `MONGODB_URI`
+- `ELASTICSEARCH_NODE`
 - `JWT_SECRET`
 - `JWT_EXPIRES_IN`
-- `PORT`
-
-Web (apps/web/.env.local):
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
 - `NEXT_PUBLIC_API_URL`
+- `BACKUP_OUTPUT_DIR`

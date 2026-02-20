@@ -11,8 +11,10 @@ export class UsersService implements OnModuleInit {
   async onModuleInit() {
     const count = await this.usersRepository.count();
     if (count === 0) {
-      const passwordHash = await bcrypt.hash('admin', 10);
-      await this.usersRepository.create({ username: 'admin', passwordHash, role: 'admin' });
+      const username = process.env.ADMIN_USERNAME ?? 'admin';
+      const password = process.env.ADMIN_PASSWORD ?? 'admin';
+      const passwordHash = await bcrypt.hash(password, 10);
+      await this.usersRepository.create({ username, passwordHash, role: 'admin' });
     }
   }
 

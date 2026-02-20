@@ -3,7 +3,7 @@ services:
     image: mongo:6
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet"]
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo_data:/data/db
 
@@ -23,7 +23,7 @@ services:
   redis:
     image: redis:7
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
 
@@ -34,7 +34,7 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
@@ -44,11 +44,13 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - PORT=3001
-      - MONGODB_URI=mongodb://mongo:27017/offers-base?replicaSet=rs0
-      - ELASTICSEARCH_NODE=http://elasticsearch:9200
-      - JWT_SECRET=change-me
-      - JWT_EXPIRES_IN=12h
+      - PORT=${API_PORT:-3001}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/offers-base?replicaSet=rs0}
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - JWT_SECRET=${JWT_SECRET:-change-me}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-12h}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
     depends_on:
       mongo-init-replica:
         condition: service_completed_successfully
@@ -57,19 +59,19 @@ services:
       elasticsearch:
         condition: service_started
     ports:
-      - "3001:3001"
+      - "${API_PORT:-3001}:3001"
 
   web:
     build:
       context: ./apps/web
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - PORT=${WEB_PORT:-3000}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     depends_on:
       - api
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
 
 volumes:
   mongo_data:

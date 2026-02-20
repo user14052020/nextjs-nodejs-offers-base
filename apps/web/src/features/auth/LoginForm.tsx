@@ -5,8 +5,8 @@ import { apiFetch } from '@/shared/api/http';
 import { setToken, setUser } from '@/shared/lib/auth';
 
 export const LoginForm: React.FC = () => {
-  const [username, setUsername] = React.useState('admin');
-  const [password, setPassword] = React.useState('admin');
+  const [username, setUsername] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
@@ -36,7 +36,7 @@ export const LoginForm: React.FC = () => {
     <form onSubmit={handleSubmit} className="card grid" style={{ gap: 16 }}>
       <div>
         <h2>Вход</h2>
-        <p className="muted">Используйте admin/admin при первом запуске.</p>
+        <p className="muted">Используйте учетные данные администратора из `.env`.</p>
       </div>
 
       <label className="grid" style={{ gap: 6 }}>
@@ -56,7 +56,7 @@ export const LoginForm: React.FC = () => {
 
       {error && <div className="badge" style={{ background: '#ffe2d9' }}>{error}</div>}
 
-      <button className="button" type="submit" disabled={loading}>
+      <button className="button" type="submit" disabled={loading || !username || !password}>
         {loading ? 'Входим...' : 'Войти'}
       </button>
     </form>

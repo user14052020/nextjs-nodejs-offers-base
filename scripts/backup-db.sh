@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API_URL="${API_URL:-http://localhost:3001}"
-BACKUP_USERNAME="${BACKUP_USERNAME:-admin}"
-BACKUP_PASSWORD="${BACKUP_PASSWORD:-admin}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  set -a
+  source "${ROOT_DIR}/.env"
+  set +a
+fi
+
+API_URL="${API_URL:-http://localhost:${API_PORT:-3001}}"
+BACKUP_USERNAME="${BACKUP_USERNAME:-${ADMIN_USERNAME:-admin}}"
+BACKUP_PASSWORD="${BACKUP_PASSWORD:-${ADMIN_PASSWORD:-admin}}"
 BACKUP_OUTPUT_DIR="${BACKUP_OUTPUT_DIR:-./backups}"
 
 mkdir -p "$BACKUP_OUTPUT_DIR"
