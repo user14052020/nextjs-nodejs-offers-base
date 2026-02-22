@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { Alert, Button, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+
 import { apiFetch } from '@/shared/api/http';
 import { setToken, setUser } from '@/shared/lib/auth';
 
@@ -33,32 +35,29 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card grid" style={{ gap: 16 }}>
-      <div>
-        <h2>Вход</h2>
-        <p className="muted">Используйте учетные данные администратора из `.env`.</p>
-      </div>
+    <Paper withBorder shadow="sm" radius="lg" p="xl" component="form" onSubmit={handleSubmit}>
+      <Stack gap="md">
+        <div>
+          <Title order={2}>Вход</Title>
+          <Text c="dimmed" size="sm">
+            Используйте учетные данные администратора из `.env`.
+          </Text>
+        </div>
 
-      <label className="grid" style={{ gap: 6 }}>
-        <span className="label">Логин</span>
-        <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} />
-      </label>
+        <TextInput label="Логин" value={username} onChange={(event) => setUsername(event.currentTarget.value)} />
 
-      <label className="grid" style={{ gap: 6 }}>
-        <span className="label">Пароль</span>
-        <input
-          type="password"
-          className="input"
+        <PasswordInput
+          label="Пароль"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) => setPassword(event.currentTarget.value)}
         />
-      </label>
 
-      {error && <div className="badge" style={{ background: '#ffe2d9' }}>{error}</div>}
+        {error && <Alert color="red">{error}</Alert>}
 
-      <button className="button" type="submit" disabled={loading || !username || !password}>
-        {loading ? 'Входим...' : 'Войти'}
-      </button>
-    </form>
+        <Button type="submit" loading={loading} disabled={!username || !password}>
+          Войти
+        </Button>
+      </Stack>
+    </Paper>
   );
 };

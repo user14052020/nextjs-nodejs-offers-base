@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Types } from 'mongoose';
 import PDFDocument = require('pdfkit');
 
@@ -30,6 +30,8 @@ type WorkLineItem = {
 
 @Injectable()
 export class WorksService implements OnModuleInit {
+  private readonly logger = new Logger(WorksService.name);
+
   constructor(
     private readonly worksRepository: WorksRepository,
     private readonly organizationsService: OrganizationsService,
@@ -43,7 +45,12 @@ export class WorksService implements OnModuleInit {
     await this.worksRepository.ensureYearlyNumberIndexes();
     const rows = await this.worksRepository.findAll();
     for (const row of rows) {
-      await this.indexWork(row);
+      try {
+        await this.indexWork(row);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(`Failed to index work ${row._id.toString()} on startup: ${message}`);
+      }
     }
   }
 
@@ -190,16 +197,14 @@ export class WorksService implements OnModuleInit {
 
   async generateActPdf(id: string) {
     const work = await this.findById(id);
-    const organization = await this.organizationsService.findById(work.executorOrganizationId.toString());
-    const client = await this.clientsService.findById(work.clientId.toString());
+    const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
 
     return this.buildActPdf(work, organization, client);
   }
 
   async generateInvoicePdf(id: string) {
     const work = await this.findById(id);
-    const organization = await this.organizationsService.findById(work.executorOrganizationId.toString());
-    const client = await this.clientsService.findById(work.clientId.toString());
+    const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
 
     return this.buildInvoicePdf(work, organization, client);
   }
@@ -991,8 +996,18 @@ export class WorksService implements OnModuleInit {
     executorOrganizationId: { toString: () => string };
     clientId: { toString: () => string };
   }) {
-    const organization = await this.organizationsService.findById(work.executorOrganizationId.toString());
-    const client = await this.clientsService.findById(work.clientId.toString());
+    const organizationResult = await this.tryFindOrganization(work.executorOrganizationId.toString());
+    const clientResult = await this.tryFindClient(work.clientId.toString());
+
+    if (!organizationResult || !clientResult) {
+      await this.searchService.deleteWork(work._id.toString());
+      this.logger.warn(
+        `Skipped indexing work ${work._id.toString()} due to missing related records: ` +
+          `organization=${Boolean(organizationResult)} client=${Boolean(clientResult)}`
+      );
+      return;
+    }
+
     const items = this.normalizeWorkItems(work);
     const itemsText = items
       .map((item) => `${item.name} ${this.formatQuantity(item.quantity)} ${this.formatAmount(item.price)}`)
@@ -1009,8 +1024,60 @@ export class WorksService implements OnModuleInit {
       currency: work.currency,
       executorOrganizationId: work.executorOrganizationId.toString(),
       clientId: work.clientId.toString(),
-      executorOrganizationName: organization.name,
-      clientName: client.name
+      executorOrganizationName: organizationResult.name,
+      clientName: clientResult.name
     });
+  }
+
+  private async tryFindOrganization(id: string) {
+    try {
+      return await this.organizationsService.findById(id);
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async tryFindClient(id: string) {
+    try {
+      return await this.clientsService.findById(id);
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    if (error instanceof NotFoundServiceException) {
+      return true;
+    }
+
+    if (error && typeof error === 'object') {
+      const candidate = error as { code?: unknown; status?: unknown };
+      return candidate.code === 'NOT_FOUND' || candidate.status === 404;
+    }
+
+    return false;
+  }
+
+  private async resolveWorkPartiesForDocuments(work: {
+    executorOrganizationId: { toString: () => string };
+    clientId: { toString: () => string };
+  }) {
+    const organization = await this.tryFindOrganization(work.executorOrganizationId.toString());
+    const client = await this.tryFindClient(work.clientId.toString());
+
+    if (!organization || !client) {
+      throw new ValidationServiceException(
+        'У работы отсутствуют актуальные реквизиты организации или клиента. ' +
+          'Откройте работу в режиме редактирования и заново выберите организацию/клиента.'
+      );
+    }
+
+    return { organization, client };
   }
 }

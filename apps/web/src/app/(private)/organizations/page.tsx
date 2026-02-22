@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Alert, Button, Group, Paper, Stack, TextInput } from '@mantine/core';
 
 import { fetchOrganizations } from '@/entities/organization/api';
 import { Organization } from '@/entities/organization/types';
@@ -34,39 +35,39 @@ export default function OrganizationsPage() {
   }, [load, activeQuery]);
 
   return (
-    <div className="grid" style={{ gap: 24 }}>
-      <div className="card">
+    <Stack gap="xl">
+      <Paper withBorder shadow="sm" radius="lg" p="lg">
         <form
-          className="flex"
           onSubmit={(event) => {
             event.preventDefault();
             setActiveQuery(query);
           }}
         >
-          <input
-            className="input"
-            placeholder="Поиск по организациям: название, ИНН, КПП, банк, счет, адрес..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <button className="button" type="submit">
-            Найти
-          </button>
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => {
-              setQuery('');
-              setActiveQuery('');
-            }}
-          >
-            Сброс
-          </button>
+          <Group align="end" wrap="wrap">
+            <TextInput
+              style={{ flex: 1, minWidth: 260 }}
+              placeholder="Поиск по организациям: название, ИНН, КПП, банк, счет, адрес..."
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+            <Button type="submit">Найти</Button>
+            <Button
+              variant="light"
+              color="gray"
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setActiveQuery('');
+              }}
+            >
+              Сброс
+            </Button>
+          </Group>
         </form>
-      </div>
+      </Paper>
       <OrganizationForm onSaved={handleSaved} editingItem={editingItem} onCancelEdit={() => setEditingItem(null)} />
-      {error && <div className="card">{error}</div>}
+      {error && <Alert color="red">{error}</Alert>}
       <OrganizationsTable items={items} onChange={() => load(activeQuery)} onEdit={setEditingItem} />
-    </div>
+    </Stack>
   );
 }

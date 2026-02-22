@@ -1,19 +1,20 @@
 import Link from 'next/link';
+import { Button, Container, Paper, Stack, Text, Title } from '@mantine/core';
 
 export default function HomePage() {
   return (
-    <main>
-      <div className="container grid" style={{ gap: 24 }}>
-        <section className="card">
-          <h1>Offers Base</h1>
-          <p className="muted">
+    <Container size="md" py={56}>
+      <Paper withBorder shadow="sm" radius="lg" p="xl">
+        <Stack gap="md">
+          <Title order={1}>Offers Base</Title>
+          <Text c="dimmed">
             Минимальный кабинет ИП: организации, клиенты, выполненные работы и PDF‑документы.
-          </p>
-          <Link className="button" href="/login">
+          </Text>
+          <Button component={Link} href="/login" w="fit-content">
             Перейти к входу
-          </Link>
-        </section>
-      </div>
-    </main>
+          </Button>
+        </Stack>
+      </Paper>
+    </Container>
   );
 }

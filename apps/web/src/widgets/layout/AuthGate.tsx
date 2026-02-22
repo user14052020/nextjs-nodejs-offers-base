@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Center, Loader, Stack, Text } from '@mantine/core';
 
 import { getToken } from '@/shared/lib/auth';
 
@@ -17,7 +18,14 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }, []);
 
   if (!ready) {
-    return <div className="container" style={{ padding: 40 }}>Проверяем доступ...</div>;
+    return (
+      <Center py={80}>
+        <Stack align="center" gap="sm">
+          <Loader size="sm" />
+          <Text c="dimmed">Проверяем доступ...</Text>
+        </Stack>
+      </Center>
+    );
   }
 
   return <>{children}</>;

@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import { Alert, Button, Group, Paper, Stack, Table, Text, Title } from '@mantine/core';
 
-import { deleteClient, deleteClientFile, uploadClientFiles } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
+import { deleteClient, deleteClientFile, uploadClientFiles } from '@/entities/client/api';
 import { getApiUrl, fetchBlob } from '@/shared/api/http';
 import { formatFileSize } from '@/shared/lib/format';
 
@@ -133,91 +134,105 @@ export const ClientsTable: React.FC<{
   };
 
   return (
-    <div className="card">
-      <h3>Список клиентов</h3>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>ИНН</th>
-            <th>Банк</th>
-            <th>Договор</th>
-            <th>Файлы</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((client) => (
-            <tr key={client._id}>
-              <td>{client.name}</td>
-              <td>{client.inn || '—'}</td>
-              <td>{client.bankName || '—'}</td>
-              <td>{client.contract || '—'}</td>
-              <td>
-                <div className="grid" style={{ gap: 6 }}>
-                  {(client.files || []).filter(Boolean).map((file, index) => {
-                    const fileId = getFileId(file);
-                    const fileName = getFileName(file, fileId);
-                    const fileSize = getFileSize(file);
+    <Paper withBorder shadow="sm" radius="lg" p="xl">
+      <Stack gap="md">
+        <Title order={3}>Список клиентов</Title>
+        <Table striped highlightOnHover withTableBorder withColumnBorders>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Название</Table.Th>
+              <Table.Th>ИНН</Table.Th>
+              <Table.Th>Банк</Table.Th>
+              <Table.Th>Договор</Table.Th>
+              <Table.Th>Файлы</Table.Th>
+              <Table.Th>Действия</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {items.map((client) => (
+              <Table.Tr key={client._id}>
+                <Table.Td>{client.name}</Table.Td>
+                <Table.Td>{client.inn || '—'}</Table.Td>
+                <Table.Td>{client.bankName || '—'}</Table.Td>
+                <Table.Td>{client.contract || '—'}</Table.Td>
+                <Table.Td>
+                  <Stack gap={6}>
+                    {(client.files || []).filter(Boolean).map((file, index) => {
+                      const fileId = getFileId(file);
+                      const fileName = getFileName(file, fileId);
+                      const fileSize = getFileSize(file);
 
-                    return (
-                      <div key={fileId || `${client._id}-${index}`} className="flex" style={{ gap: 8 }}>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          disabled={!fileId}
-                          onClick={() => handleDownloadFile(fileId, fileName)}
-                        >
-                          {fileName}
-                        </button>
-                        <span className="muted">{formatFileSize(fileSize)}</span>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          disabled={loadingId === client._id || !fileId}
-                          onClick={() => handleDeleteFile(client._id, fileId)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {(client.files || []).length === 0 && <span className="muted">Нет вложений</span>}
-                </div>
-              </td>
-              <td className="flex">
-                <label className="button secondary">
-                  Загрузить
-                  <input
-                    type="file"
-                    multiple
-                    hidden
-                    onChange={(event) => handleUpload(client._id, event.target.files)}
-                  />
-                </label>
-                <button
-                  className="button secondary"
-                  type="button"
-                  disabled={loadingId === client._id}
-                  onClick={() => onEdit(client)}
-                >
-                  Редактировать
-                </button>
-                <button
-                  className="button secondary"
-                  type="button"
-                  disabled={loadingId === client._id}
-                  onClick={() => handleDelete(client._id)}
-                >
-                  Удалить
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {error && <p className="muted">{error}</p>}
-      {items.length === 0 && <p className="muted">Пока нет клиентов.</p>}
-    </div>
+                      return (
+                        <Group key={fileId || `${client._id}-${index}`} gap="xs" wrap="wrap">
+                          <Button
+                            variant="light"
+                            color="gray"
+                            size="xs"
+                            disabled={!fileId}
+                            onClick={() => handleDownloadFile(fileId, fileName)}
+                          >
+                            {fileName}
+                          </Button>
+                          <Text size="sm" c="dimmed">
+                            {formatFileSize(fileSize)}
+                          </Text>
+                          <Button
+                            variant="light"
+                            color="red"
+                            size="xs"
+                            disabled={loadingId === client._id || !fileId}
+                            onClick={() => handleDeleteFile(client._id, fileId)}
+                          >
+                            Удалить
+                          </Button>
+                        </Group>
+                      );
+                    })}
+                    {(client.files || []).length === 0 && (
+                      <Text size="sm" c="dimmed">
+                        Нет вложений
+                      </Text>
+                    )}
+                  </Stack>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs" wrap="wrap">
+                    <Button variant="light" color="gray" size="xs" component="label">
+                      Загрузить
+                      <input type="file" multiple hidden onChange={(event) => handleUpload(client._id, event.target.files)} />
+                    </Button>
+                    <Button
+                      variant="light"
+                      color="gray"
+                      size="xs"
+                      disabled={loadingId === client._id}
+                      onClick={() => onEdit(client)}
+                    >
+                      Редактировать
+                    </Button>
+                    <Button
+                      variant="light"
+                      color="red"
+                      size="xs"
+                      disabled={loadingId === client._id}
+                      onClick={() => handleDelete(client._id)}
+                    >
+                      Удалить
+                    </Button>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+
+        {error && <Alert color="red">{error}</Alert>}
+        {items.length === 0 && (
+          <Text size="sm" c="dimmed">
+            Пока нет клиентов.
+          </Text>
+        )}
+      </Stack>
+    </Paper>
   );
 };

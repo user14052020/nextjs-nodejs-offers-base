@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
+import { Button, Group, Paper, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 
+import { Client } from '@/entities/client/types';
 import { createWork, updateWork } from '@/entities/work/api';
 import { Work } from '@/entities/work/types';
-import { Field } from '@/shared/ui/Field';
-import { Client } from '@/entities/client/types';
 import { Organization } from '@/entities/organization/types';
+import { Field } from '@/shared/ui/Field';
 
 type WorkItemForm = {
   name: string;
@@ -48,6 +49,21 @@ const normalizeItemFromWork = (work: Work): WorkItemForm[] => {
   return [emptyItem()];
 };
 
+const toDateInputValue = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const todayDateInputValue = () => new Date().toISOString().slice(0, 10);
+
 export const WorkForm: React.FC<{
   organizations: Organization[];
   clients: Client[];
@@ -61,7 +77,8 @@ export const WorkForm: React.FC<{
     executorOrganizationId: '',
     clientId: '',
     actNumber: '',
-    invoiceNumber: ''
+    invoiceNumber: '',
+    documentDate: todayDateInputValue()
   });
   const [loading, setLoading] = React.useState(false);
 
@@ -73,20 +90,26 @@ export const WorkForm: React.FC<{
         executorOrganizationId: '',
         clientId: '',
         actNumber: '',
-        invoiceNumber: ''
+        invoiceNumber: '',
+        documentDate: todayDateInputValue()
       });
       return;
     }
 
+    const hasOrganization = organizations.some((org) => org._id === editingItem.executorOrganizationId);
+    const hasClient = clients.some((client) => client._id === editingItem.clientId);
+
     setForm({
       items: normalizeItemFromWork(editingItem),
       currency: editingItem.currency || 'RUB',
-      executorOrganizationId: editingItem.executorOrganizationId || '',
-      clientId: editingItem.clientId || '',
+      executorOrganizationId: hasOrganization ? editingItem.executorOrganizationId : '',
+      clientId: hasClient ? editingItem.clientId : '',
       actNumber: editingItem.actNumber || '',
-      invoiceNumber: editingItem.invoiceNumber || ''
+      invoiceNumber: editingItem.invoiceNumber || '',
+      documentDate:
+        toDateInputValue(editingItem.actDate) || toDateInputValue(editingItem.invoiceDate) || todayDateInputValue()
     });
-  }, [editingItem]);
+  }, [editingItem, organizations, clients]);
 
   const handleChange = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -143,7 +166,9 @@ export const WorkForm: React.FC<{
       executorOrganizationId: form.executorOrganizationId,
       clientId: form.clientId,
       actNumber: form.actNumber || undefined,
-      invoiceNumber: form.invoiceNumber || undefined
+      invoiceNumber: form.invoiceNumber || undefined,
+      actDate: form.documentDate || undefined,
+      invoiceDate: form.documentDate || undefined
     };
     if (editingItem) {
       await updateWork(editingItem._id, payload);
@@ -157,129 +182,133 @@ export const WorkForm: React.FC<{
       executorOrganizationId: '',
       clientId: '',
       actNumber: '',
-      invoiceNumber: ''
+      invoiceNumber: '',
+      documentDate: todayDateInputValue()
     });
     onSaved();
   };
 
+  const organizationOptions = organizations.map((org) => ({ value: org._id, label: org.name }));
+  const clientOptions = clients.map((client) => ({ value: client._id, label: client.name }));
+
   return (
-    <form onSubmit={handleSubmit} className="card grid" style={{ gap: 16 }}>
-      <div>
-        <h2>{editingItem ? 'Редактирование работы' : 'Новая работа'}</h2>
-        <p className="muted">
-          Добавьте позиции работ. Номер акта/счета можно задать вручную или оставить пустым для автонумерации по текущему году.
-        </p>
-      </div>
-
-      <div className="grid grid-2">
-        <Field label="Организация">
-          <select
-            className="select"
-            value={form.executorOrganizationId}
-            onChange={(e) => handleChange('executorOrganizationId', e.target.value)}
-          >
-            <option value="">Выберите организацию</option>
-            {organizations.map((org) => (
-              <option key={org._id} value={org._id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Клиент">
-          <select className="select" value={form.clientId} onChange={(e) => handleChange('clientId', e.target.value)}>
-            <option value="">Выберите клиента</option>
-            {clients.map((client) => (
-              <option key={client._id} value={client._id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Номер акта (опционально)">
-          <input className="input" value={form.actNumber} onChange={(e) => handleChange('actNumber', e.target.value)} />
-        </Field>
-        <Field label="Номер счета (опционально)">
-          <input
-            className="input"
-            value={form.invoiceNumber}
-            onChange={(e) => handleChange('invoiceNumber', e.target.value)}
-          />
-        </Field>
-      </div>
-
-      <div className="grid" style={{ gap: 8 }}>
-        <div className="flex" style={{ justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Позиции работ</h3>
-          <button className="button secondary" type="button" onClick={handleAddItem}>
-            Добавить позицию
-          </button>
+    <Paper withBorder shadow="sm" radius="lg" p="xl" component="form" onSubmit={handleSubmit}>
+      <Stack gap="md">
+        <div>
+          <Title order={2}>{editingItem ? 'Редактирование работы' : 'Новая работа'}</Title>
+          <Text size="sm" c="dimmed">
+            Добавьте позиции работ. Номер акта/счета можно задать вручную или оставить пустым для автонумерации по
+            текущему году.
+          </Text>
         </div>
-        {form.items.map((item, index) => (
-          <div
-            key={index}
-            className="grid"
-            style={{ gap: 10, gridTemplateColumns: '2fr 0.7fr 0.9fr 0.9fr auto', alignItems: 'end' }}
-          >
-            <Field label="Наименование">
-              <input
-                className="input"
-                value={item.name}
-                onChange={(event) => handleItemChange(index, 'name', event.target.value)}
-              />
-            </Field>
-            <Field label="Кол-во">
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.001"
-                value={item.quantity}
-                onChange={(event) => handleItemChange(index, 'quantity', event.target.value)}
-              />
-            </Field>
-            <Field label="Цена">
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={item.price}
-                onChange={(event) => handleItemChange(index, 'price', event.target.value)}
-              />
-            </Field>
-            <Field label="Сумма">
-              <input className="input" value={formatAmount(itemAmount(item))} readOnly />
-            </Field>
-            <button
-              className="button secondary"
-              type="button"
-              disabled={form.items.length === 1}
-              onClick={() => handleRemoveItem(index)}
-            >
-              Удалить
-            </button>
-          </div>
-        ))}
-        <p className="muted" style={{ margin: 0 }}>
-          Итого по позициям: {formatAmount(totalAmount)} RUB
-        </p>
-      </div>
 
-      <div className="flex">
-        <button
-          className="button"
-          type="submit"
-          disabled={loading || !form.executorOrganizationId || !form.clientId || payloadItems.length === 0}
-        >
-          {loading ? 'Сохраняем...' : editingItem ? 'Сохранить изменения' : 'Создать'}
-        </button>
-        {editingItem && (
-          <button className="button secondary" type="button" onClick={onCancelEdit}>
-            Отмена
-          </button>
-        )}
-      </div>
-    </form>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Field label="Организация">
+            <Select
+              placeholder="Выберите организацию"
+              value={form.executorOrganizationId || null}
+              data={organizationOptions}
+              onChange={(value) => handleChange('executorOrganizationId', value || '')}
+              searchable
+            />
+          </Field>
+          <Field label="Клиент">
+            <Select
+              placeholder="Выберите клиента"
+              value={form.clientId || null}
+              data={clientOptions}
+              onChange={(value) => handleChange('clientId', value || '')}
+              searchable
+            />
+          </Field>
+          <Field label="Номер акта (опционально)">
+            <TextInput value={form.actNumber} onChange={(event) => handleChange('actNumber', event.currentTarget.value)} />
+          </Field>
+          <Field label="Номер счета (опционально)">
+            <TextInput
+              value={form.invoiceNumber}
+              onChange={(event) => handleChange('invoiceNumber', event.currentTarget.value)}
+            />
+          </Field>
+          <Field label="Дата документа">
+            <TextInput
+              type="date"
+              value={form.documentDate}
+              onChange={(event) => handleChange('documentDate', event.currentTarget.value)}
+            />
+          </Field>
+        </SimpleGrid>
+
+        <Stack gap="sm">
+          <Group justify="space-between">
+            <Title order={3}>Позиции работ</Title>
+            <Button variant="light" color="gray" type="button" onClick={handleAddItem}>
+              Добавить позицию
+            </Button>
+          </Group>
+
+          {form.items.map((item, index) => (
+            <Paper key={index} withBorder p="md" radius="md">
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 5 }} spacing="sm">
+                <Field label="Наименование">
+                  <TextInput value={item.name} onChange={(event) => handleItemChange(index, 'name', event.currentTarget.value)} />
+                </Field>
+                <Field label="Кол-во">
+                  <TextInput
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={item.quantity}
+                    onChange={(event) => handleItemChange(index, 'quantity', event.currentTarget.value)}
+                  />
+                </Field>
+                <Field label="Цена">
+                  <TextInput
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.price}
+                    onChange={(event) => handleItemChange(index, 'price', event.currentTarget.value)}
+                  />
+                </Field>
+                <Field label="Сумма">
+                  <TextInput value={formatAmount(itemAmount(item))} readOnly />
+                </Field>
+                <Field label="Действие">
+                  <Button
+                    variant="light"
+                    color="red"
+                    type="button"
+                    disabled={form.items.length === 1}
+                    onClick={() => handleRemoveItem(index)}
+                  >
+                    Удалить
+                  </Button>
+                </Field>
+              </SimpleGrid>
+            </Paper>
+          ))}
+
+          <Text size="sm" c="dimmed">
+            Итого по позициям: {formatAmount(totalAmount)} RUB
+          </Text>
+        </Stack>
+
+        <Group>
+          <Button
+            type="submit"
+            loading={loading}
+            disabled={!form.executorOrganizationId || !form.clientId || payloadItems.length === 0}
+          >
+            {editingItem ? 'Сохранить изменения' : 'Создать'}
+          </Button>
+          {editingItem && (
+            <Button variant="light" color="gray" type="button" onClick={onCancelEdit}>
+              Отмена
+            </Button>
+          )}
+        </Group>
+      </Stack>
+    </Paper>
   );
 };

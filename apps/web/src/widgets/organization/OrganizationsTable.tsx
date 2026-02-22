@@ -1,13 +1,10 @@
 'use client';
 
 import React from 'react';
+import { Alert, Button, Group, Paper, Stack, Table, Text, Title } from '@mantine/core';
 
-import {
-  deleteOrganization,
-  deleteOrganizationFile,
-  uploadOrganizationFiles
-} from '@/entities/organization/api';
 import { Organization } from '@/entities/organization/types';
+import { deleteOrganization, deleteOrganizationFile, uploadOrganizationFiles } from '@/entities/organization/api';
 import { getApiUrl, fetchBlob } from '@/shared/api/http';
 import { formatFileSize } from '@/shared/lib/format';
 
@@ -137,91 +134,93 @@ export const OrganizationsTable: React.FC<{
   };
 
   return (
-    <div className="card">
-      <h3>Список организаций</h3>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>Короткое имя</th>
-            <th>ИНН</th>
-            <th>Банк</th>
-            <th>Файлы</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((org) => (
-            <tr key={org._id}>
-              <td>{org.name}</td>
-              <td>{org.shortName || '—'}</td>
-              <td>{org.inn || '—'}</td>
-              <td>{org.bankName || '—'}</td>
-              <td>
-                <div className="grid" style={{ gap: 6 }}>
-                  {(org.files || []).filter(Boolean).map((file, index) => {
-                    const fileId = getFileId(file);
-                    const fileName = getFileName(file, fileId);
-                    const fileSize = getFileSize(file);
+    <Paper withBorder shadow="sm" radius="lg" p="xl">
+      <Stack gap="md">
+        <Title order={3}>Список организаций</Title>
+        <Table striped highlightOnHover withTableBorder withColumnBorders>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Название</Table.Th>
+              <Table.Th>Короткое имя</Table.Th>
+              <Table.Th>ИНН</Table.Th>
+              <Table.Th>Банк</Table.Th>
+              <Table.Th>Файлы</Table.Th>
+              <Table.Th>Действия</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {items.map((org) => (
+              <Table.Tr key={org._id}>
+                <Table.Td>{org.name}</Table.Td>
+                <Table.Td>{org.shortName || '—'}</Table.Td>
+                <Table.Td>{org.inn || '—'}</Table.Td>
+                <Table.Td>{org.bankName || '—'}</Table.Td>
+                <Table.Td>
+                  <Stack gap={6}>
+                    {(org.files || []).filter(Boolean).map((file, index) => {
+                      const fileId = getFileId(file);
+                      const fileName = getFileName(file, fileId);
+                      const fileSize = getFileSize(file);
 
-                    return (
-                      <div key={fileId || `${org._id}-${index}`} className="flex" style={{ gap: 8 }}>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          disabled={!fileId}
-                          onClick={() => handleDownloadFile(fileId, fileName)}
-                        >
-                          {fileName}
-                        </button>
-                        <span className="muted">{formatFileSize(fileSize)}</span>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          disabled={loadingId === org._id || !fileId}
-                          onClick={() => handleDeleteFile(org._id, fileId)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {(org.files || []).length === 0 && <span className="muted">Нет вложений</span>}
-                </div>
-              </td>
-              <td className="flex">
-                <label className="button secondary">
-                  Загрузить
-                  <input
-                    type="file"
-                    multiple
-                    hidden
-                    onChange={(event) => handleUpload(org._id, event.target.files)}
-                  />
-                </label>
-                <button
-                  className="button secondary"
-                  type="button"
-                  disabled={loadingId === org._id}
-                  onClick={() => onEdit(org)}
-                >
-                  Редактировать
-                </button>
-                <button
-                  className="button secondary"
-                  type="button"
-                  disabled={loadingId === org._id}
-                  onClick={() => handleDelete(org._id)}
-                >
-                  Удалить
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {error && <p className="muted">{error}</p>}
-      {items.length === 0 && <p className="muted">Пока нет организаций.</p>}
-    </div>
+                      return (
+                        <Group key={fileId || `${org._id}-${index}`} gap="xs" wrap="wrap">
+                          <Button
+                            variant="light"
+                            color="gray"
+                            size="xs"
+                            disabled={!fileId}
+                            onClick={() => handleDownloadFile(fileId, fileName)}
+                          >
+                            {fileName}
+                          </Button>
+                          <Text size="sm" c="dimmed">
+                            {formatFileSize(fileSize)}
+                          </Text>
+                          <Button
+                            variant="light"
+                            color="red"
+                            size="xs"
+                            disabled={loadingId === org._id || !fileId}
+                            onClick={() => handleDeleteFile(org._id, fileId)}
+                          >
+                            Удалить
+                          </Button>
+                        </Group>
+                      );
+                    })}
+                    {(org.files || []).length === 0 && (
+                      <Text size="sm" c="dimmed">
+                        Нет вложений
+                      </Text>
+                    )}
+                  </Stack>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs" wrap="wrap">
+                    <Button variant="light" color="gray" size="xs" component="label">
+                      Загрузить
+                      <input type="file" multiple hidden onChange={(event) => handleUpload(org._id, event.target.files)} />
+                    </Button>
+                    <Button variant="light" color="gray" size="xs" disabled={loadingId === org._id} onClick={() => onEdit(org)}>
+                      Редактировать
+                    </Button>
+                    <Button variant="light" color="red" size="xs" disabled={loadingId === org._id} onClick={() => handleDelete(org._id)}>
+                      Удалить
+                    </Button>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+
+        {error && <Alert color="red">{error}</Alert>}
+        {items.length === 0 && (
+          <Text size="sm" c="dimmed">
+            Пока нет организаций.
+          </Text>
+        )}
+      </Stack>
+    </Paper>
   );
 };

@@ -1,12 +1,46 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 
 import { Work, WorkDocument } from './work.schema';
 
 @Injectable()
 export class WorksRepository {
   constructor(@InjectModel(Work.name) private readonly workModel: Model<WorkDocument>) {}
+
+  // Restored backups can contain legacy string _id values, so raw collection fallback
+  // intentionally bypasses ObjectId-only typing.
+  private rawIdFilter(id: string) {
+    return { _id: id } as any;
+  }
+
+  private idCandidates(id: string) {
+    if (Types.ObjectId.isValid(id)) {
+      return [id, new Types.ObjectId(id)];
+    }
+
+    return [id];
+  }
+
+  private idsCandidates(ids: string[]) {
+    const candidates: Array<string | Types.ObjectId> = [];
+    const unique = new Set<string>();
+
+    for (const id of ids) {
+      if (!id || unique.has(id)) {
+        continue;
+      }
+
+      unique.add(id);
+      candidates.push(id);
+
+      if (Types.ObjectId.isValid(id)) {
+        candidates.push(new Types.ObjectId(id));
+      }
+    }
+
+    return candidates;
+  }
 
   async backfillYears() {
     await this.workModel.updateMany(
@@ -51,11 +85,17 @@ export class WorksRepository {
   }
 
   async findByIds(ids: string[]) {
-    return this.workModel.find({ _id: { $in: ids } }).exec();
+    return this.workModel.find({ _id: { $in: this.idsCandidates(ids) } }).exec();
   }
 
   async findById(id: string) {
-    return this.workModel.findById(id).exec();
+    const found = await this.workModel.findOne({ _id: { $in: this.idCandidates(id) } }).exec();
+    if (found) {
+      return found;
+    }
+
+    const raw = await this.workModel.collection.findOne(this.rawIdFilter(id));
+    return raw ? this.workModel.hydrate(raw) : null;
   }
 
   async create(payload: Partial<Work>, session?: ClientSession) {
@@ -64,11 +104,33 @@ export class WorksRepository {
   }
 
   async update(id: string, payload: Partial<Work>, session?: ClientSession) {
-    return this.workModel.findByIdAndUpdate(id, payload, { new: true, session }).exec();
+    const updated = await this.workModel
+      .findOneAndUpdate({ _id: { $in: this.idCandidates(id) } }, payload, { new: true, session })
+      .exec();
+    if (updated) {
+      return updated;
+    }
+
+    const rawResult = await this.workModel.collection.findOneAndUpdate(
+      this.rawIdFilter(id),
+      { $set: payload },
+      { returnDocument: 'after', session }
+    );
+    const raw = this.unwrapCollectionResult(rawResult);
+    return raw ? this.workModel.hydrate(raw) : null;
   }
 
   async delete(id: string, session?: ClientSession) {
-    return this.workModel.findByIdAndDelete(id, { session }).exec();
+    const removed = await this.workModel
+      .findOneAndDelete({ _id: { $in: this.idCandidates(id) } }, { session })
+      .exec();
+    if (removed) {
+      return removed;
+    }
+
+    const rawResult = await this.workModel.collection.findOneAndDelete(this.rawIdFilter(id), { session });
+    const raw = this.unwrapCollectionResult(rawResult);
+    return raw ? this.workModel.hydrate(raw) : null;
   }
 
   async findByActNumberInYear(actNumber: string, actYear: number) {
@@ -111,5 +173,18 @@ export class WorksRepository {
     ]);
 
     return result[0]?.value ?? 0;
+  }
+
+  private unwrapCollectionResult<T>(result: T | { value?: T | null } | null | undefined): T | null {
+    if (!result) {
+      return null;
+    }
+
+    if (typeof result === 'object' && 'value' in (result as Record<string, unknown>)) {
+      const value = (result as { value?: T | null }).value;
+      return value ?? null;
+    }
+
+    return result as T;
   }
 }

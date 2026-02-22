@@ -1,6 +1,18 @@
 'use client';
 
 import React from 'react';
+import {
+  Alert,
+  Button,
+  Divider,
+  FileInput,
+  Group,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+  Title
+} from '@mantine/core';
 
 import { apiFetch, fetchApiFile } from '@/shared/api/http';
 import { Field } from '@/shared/ui/Field';
@@ -86,9 +98,7 @@ export const ChangePasswordForm: React.FC = () => {
         }
       );
 
-      setRestoreMessage(
-        `${result.message}. Коллекций: ${result.collections}, документов: ${result.documents}.`
-      );
+      setRestoreMessage(`${result.message}. Коллекций: ${result.collections}, документов: ${result.documents}.`);
       setRestoreFile(null);
     } catch (err) {
       setRestoreError(err instanceof Error ? err.message : 'Не удалось восстановить бэкап');
@@ -98,70 +108,71 @@ export const ChangePasswordForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card grid" style={{ gap: 16, maxWidth: 560 }}>
-      <div>
-        <h2>Смена пароля</h2>
-        <p className="muted">Новый пароль минимум 6 символов.</p>
-      </div>
-
-      <Field label="Текущий пароль">
-        <input
-          type="password"
-          className="input"
-          value={oldPassword}
-          onChange={(event) => setOldPassword(event.target.value)}
-        />
-      </Field>
-
-      <Field label="Новый пароль">
-        <input
-          type="password"
-          className="input"
-          value={newPassword}
-          onChange={(event) => setNewPassword(event.target.value)}
-        />
-      </Field>
-
-      {message && <div className="badge">{message}</div>}
-      {error && <div className="badge" style={{ background: '#ffe2d9' }}>{error}</div>}
-
-      <button className="button" type="submit" disabled={loading || !oldPassword || !newPassword}>
-        {loading ? 'Сохраняем...' : 'Обновить пароль'}
-      </button>
-
-      <div className="grid" style={{ gap: 10, borderTop: '1px solid #e6ded4', paddingTop: 14 }}>
-        <h3 style={{ margin: 0 }}>Бэкап базы</h3>
-        <p className="muted" style={{ margin: 0 }}>
-          Выгрузка полного бэкапа MongoDB в формате `.json.gz`.
-        </p>
-        {backupMessage && <div className="badge">{backupMessage}</div>}
-        {backupError && <div className="badge" style={{ background: '#ffe2d9' }}>{backupError}</div>}
-        <button className="button secondary" type="button" disabled={backupLoading} onClick={handleBackupDownload}>
-          {backupLoading ? 'Выгружаем...' : 'Скачать бэкап'}
-        </button>
-
-        <div className="grid" style={{ gap: 10, marginTop: 4 }}>
-          <label className="grid" style={{ gap: 6 }}>
-            <span className="label">Файл для восстановления</span>
-            <input
-              type="file"
-              className="input"
-              accept=".json,.gz,.json.gz,application/gzip,application/json"
-              onChange={(event) => setRestoreFile(event.target.files?.[0] ?? null)}
-            />
-          </label>
-          {restoreMessage && <div className="badge">{restoreMessage}</div>}
-          {restoreError && <div className="badge" style={{ background: '#ffe2d9' }}>{restoreError}</div>}
-          <button
-            className="button secondary"
-            type="button"
-            disabled={restoreLoading || !restoreFile}
-            onClick={handleRestoreSubmit}
-          >
-            {restoreLoading ? 'Восстанавливаем...' : 'Восстановить из бэкапа'}
-          </button>
+    <Paper withBorder shadow="sm" radius="lg" p="xl" component="form" onSubmit={handleSubmit}>
+      <Stack gap="md" maw={640}>
+        <div>
+          <Title order={2}>Смена пароля</Title>
+          <Text c="dimmed" size="sm">
+            Новый пароль минимум 6 символов.
+          </Text>
         </div>
-      </div>
-    </form>
+
+        <Field label="Текущий пароль">
+          <PasswordInput value={oldPassword} onChange={(event) => setOldPassword(event.currentTarget.value)} />
+        </Field>
+
+        <Field label="Новый пароль">
+          <PasswordInput value={newPassword} onChange={(event) => setNewPassword(event.currentTarget.value)} />
+        </Field>
+
+        {message && <Alert color="green">{message}</Alert>}
+        {error && <Alert color="red">{error}</Alert>}
+
+        <Button type="submit" loading={loading} disabled={!oldPassword || !newPassword}>
+          Обновить пароль
+        </Button>
+
+        <Divider />
+
+        <Stack gap="sm">
+          <Title order={3}>Бэкап базы</Title>
+          <Text size="sm" c="dimmed">
+            Выгрузка полного бэкапа MongoDB в формате `.json.gz`.
+          </Text>
+          {backupMessage && <Alert color="green">{backupMessage}</Alert>}
+          {backupError && <Alert color="red">{backupError}</Alert>}
+          <Group>
+            <Button variant="light" loading={backupLoading} onClick={handleBackupDownload}>
+              Скачать бэкап
+            </Button>
+          </Group>
+        </Stack>
+
+        <Divider />
+
+        <Stack gap="sm">
+          <FileInput
+            label="Файл для восстановления"
+            placeholder="Выберите файл бэкапа"
+            value={restoreFile}
+            onChange={setRestoreFile}
+            accept=".json,.gz,.json.gz,application/gzip,application/json"
+          />
+          {restoreMessage && <Alert color="green">{restoreMessage}</Alert>}
+          {restoreError && <Alert color="red">{restoreError}</Alert>}
+          <Group>
+            <Button
+              variant="light"
+              color="orange"
+              loading={restoreLoading}
+              disabled={!restoreFile}
+              onClick={handleRestoreSubmit}
+            >
+              Восстановить из бэкапа
+            </Button>
+          </Group>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Alert, Button, Group, Paper, Stack, TextInput } from '@mantine/core';
 
 import { fetchClients } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
@@ -46,36 +47,36 @@ export default function WorksPage() {
   }, [load, activeQuery]);
 
   return (
-    <div className="grid" style={{ gap: 24 }}>
-      <div className="card">
+    <Stack gap="xl">
+      <Paper withBorder shadow="sm" radius="lg" p="lg">
         <form
-          className="flex"
           onSubmit={(event) => {
             event.preventDefault();
             setActiveQuery(query);
           }}
         >
-          <input
-            className="input"
-            placeholder="Поиск работ: номер акта/счета, содержимое позиций..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <button className="button" type="submit">
-            Найти
-          </button>
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => {
-              setQuery('');
-              setActiveQuery('');
-            }}
-          >
-            Сброс
-          </button>
+          <Group align="end" wrap="wrap">
+            <TextInput
+              style={{ flex: 1, minWidth: 260 }}
+              placeholder="Поиск работ: номер акта/счета, содержимое позиций..."
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+            <Button type="submit">Найти</Button>
+            <Button
+              variant="light"
+              color="gray"
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setActiveQuery('');
+              }}
+            >
+              Сброс
+            </Button>
+          </Group>
         </form>
-      </div>
+      </Paper>
       <WorkForm
         organizations={organizations}
         clients={clients}
@@ -83,7 +84,7 @@ export default function WorksPage() {
         editingItem={editingItem}
         onCancelEdit={() => setEditingItem(null)}
       />
-      {error && <div className="card">{error}</div>}
+      {error && <Alert color="red">{error}</Alert>}
       <WorksTable
         items={works}
         organizations={organizations}
@@ -91,6 +92,6 @@ export default function WorksPage() {
         onChange={() => load(activeQuery)}
         onEdit={setEditingItem}
       />
-    </div>
+    </Stack>
   );
 }

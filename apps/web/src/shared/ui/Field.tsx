@@ -1,4 +1,5 @@
 import React from 'react';
+import { Stack, Text } from '@mantine/core';
 
 type FieldProps = {
   label: string;
@@ -7,9 +8,11 @@ type FieldProps = {
 
 export const Field: React.FC<FieldProps> = ({ label, children }) => {
   return (
-    <label className="grid" style={{ gap: 6 }}>
-      <span className="label">{label}</span>
+    <Stack gap={6}>
+      <Text size="sm" c="dimmed">
+        {label}
+      </Text>
       {children}
-    </label>
+    </Stack>
   );
 };

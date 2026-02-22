@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
+import { Button, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 
 import { createClient, updateClient } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
-import { Field } from '@/shared/ui/Field';
 import { stripEmpty } from '@/shared/lib/stripEmpty';
+import { Field } from '@/shared/ui/Field';
 
 const EMPTY_FORM = {
   name: '',
@@ -72,73 +73,74 @@ export const ClientForm: React.FC<{
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card grid" style={{ gap: 16 }}>
-      <div>
-        <h2>{editingItem ? 'Редактирование клиента' : 'Клиент'}</h2>
-        <p className="muted">Реквизиты клиента и контактные данные.</p>
-      </div>
+    <Paper withBorder shadow="sm" radius="lg" p="xl" component="form" onSubmit={handleSubmit}>
+      <Stack gap="md">
+        <div>
+          <Title order={2}>{editingItem ? 'Редактирование клиента' : 'Клиент'}</Title>
+          <Text size="sm" c="dimmed">
+            Реквизиты клиента и контактные данные.
+          </Text>
+        </div>
 
-      <div className="grid grid-2">
-        <Field label="Название">
-          <input className="input" value={form.name} onChange={(e) => handleChange('name', e.target.value)} />
-        </Field>
-        <Field label="ИНН">
-          <input className="input" value={form.inn} onChange={(e) => handleChange('inn', e.target.value)} />
-        </Field>
-        <Field label="КПП">
-          <input className="input" value={form.kpp} onChange={(e) => handleChange('kpp', e.target.value)} />
-        </Field>
-        <Field label="Расчетный счет">
-          <input
-            className="input"
-            value={form.bankAccount}
-            onChange={(e) => handleChange('bankAccount', e.target.value)}
-          />
-        </Field>
-        <Field label="Банк">
-          <input className="input" value={form.bankName} onChange={(e) => handleChange('bankName', e.target.value)} />
-        </Field>
-        <Field label="БИК">
-          <input className="input" value={form.bik} onChange={(e) => handleChange('bik', e.target.value)} />
-        </Field>
-        <Field label="Корр. счет">
-          <input
-            className="input"
-            value={form.correspondentAccount}
-            onChange={(e) => handleChange('correspondentAccount', e.target.value)}
-          />
-        </Field>
-        <Field label="Адрес">
-          <input className="input" value={form.address} onChange={(e) => handleChange('address', e.target.value)} />
-        </Field>
-        <Field label="Email">
-          <input className="input" value={form.email} onChange={(e) => handleChange('email', e.target.value)} />
-        </Field>
-        <Field label="Телефон">
-          <input className="input" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} />
-        </Field>
-        <Field label="Договор (для актов)">
-          <input className="input" value={form.contract} onChange={(e) => handleChange('contract', e.target.value)} />
-        </Field>
-        <Field label="Подписант">
-          <input
-            className="input"
-            value={form.signerName}
-            onChange={(e) => handleChange('signerName', e.target.value)}
-          />
-        </Field>
-      </div>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Field label="Название">
+            <TextInput value={form.name} onChange={(event) => handleChange('name', event.currentTarget.value)} />
+          </Field>
+          <Field label="ИНН">
+            <TextInput value={form.inn} onChange={(event) => handleChange('inn', event.currentTarget.value)} />
+          </Field>
+          <Field label="КПП">
+            <TextInput value={form.kpp} onChange={(event) => handleChange('kpp', event.currentTarget.value)} />
+          </Field>
+          <Field label="Расчетный счет">
+            <TextInput
+              value={form.bankAccount}
+              onChange={(event) => handleChange('bankAccount', event.currentTarget.value)}
+            />
+          </Field>
+          <Field label="Банк">
+            <TextInput value={form.bankName} onChange={(event) => handleChange('bankName', event.currentTarget.value)} />
+          </Field>
+          <Field label="БИК">
+            <TextInput value={form.bik} onChange={(event) => handleChange('bik', event.currentTarget.value)} />
+          </Field>
+          <Field label="Корр. счет">
+            <TextInput
+              value={form.correspondentAccount}
+              onChange={(event) => handleChange('correspondentAccount', event.currentTarget.value)}
+            />
+          </Field>
+          <Field label="Адрес">
+            <TextInput value={form.address} onChange={(event) => handleChange('address', event.currentTarget.value)} />
+          </Field>
+          <Field label="Email">
+            <TextInput value={form.email} onChange={(event) => handleChange('email', event.currentTarget.value)} />
+          </Field>
+          <Field label="Телефон">
+            <TextInput value={form.phone} onChange={(event) => handleChange('phone', event.currentTarget.value)} />
+          </Field>
+          <Field label="Договор (для актов)">
+            <TextInput value={form.contract} onChange={(event) => handleChange('contract', event.currentTarget.value)} />
+          </Field>
+          <Field label="Подписант">
+            <TextInput
+              value={form.signerName}
+              onChange={(event) => handleChange('signerName', event.currentTarget.value)}
+            />
+          </Field>
+        </SimpleGrid>
 
-      <div className="flex">
-        <button className="button" type="submit" disabled={loading || !form.name}>
-          {loading ? 'Сохраняем...' : editingItem ? 'Сохранить изменения' : 'Сохранить'}
-        </button>
-        {editingItem && (
-          <button className="button secondary" type="button" onClick={onCancelEdit}>
-            Отмена
-          </button>
-        )}
-      </div>
-    </form>
+        <Group>
+          <Button type="submit" loading={loading} disabled={!form.name}>
+            {editingItem ? 'Сохранить изменения' : 'Сохранить'}
+          </Button>
+          {editingItem && (
+            <Button variant="light" color="gray" type="button" onClick={onCancelEdit}>
+              Отмена
+            </Button>
+          )}
+        </Group>
+      </Stack>
+    </Paper>
   );
 };

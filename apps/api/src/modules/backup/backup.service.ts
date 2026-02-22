@@ -92,6 +92,7 @@ export class BackupService {
     for (const [name, documents] of backupCollections) {
       const restored = (documents as unknown[])
         .map((document) => this.reviveExtendedJson(document))
+        .map((document) => this.normalizeDocumentIds(name, document))
         .filter((document): document is Record<string, unknown> => {
           return Boolean(document && typeof document === 'object' && !Array.isArray(document));
         });
@@ -254,6 +255,92 @@ export class BackupService {
       revived[key] = this.reviveExtendedJson(currentValue);
     }
     return revived;
+  }
+
+  private normalizeDocumentIds(collectionName: string, document: unknown): unknown {
+    if (!document || typeof document !== 'object' || Array.isArray(document)) {
+      return document;
+    }
+
+    const normalized = { ...(document as Record<string, unknown>) };
+
+    const normalizeIdField = (field: string) => {
+      if (field in normalized) {
+        normalized[field] = this.toObjectIdMaybe(normalized[field], true);
+      }
+    };
+
+    const normalizeIdArrayField = (field: string) => {
+      if (!(field in normalized)) {
+        return;
+      }
+
+      const value = normalized[field];
+      if (!Array.isArray(value)) {
+        return;
+      }
+
+      normalized[field] = value.map((item) => this.toObjectIdMaybe(item, true));
+    };
+
+    switch (collectionName) {
+      case 'organizations':
+      case 'clients':
+      case 'works':
+      case 'files':
+      case 'users':
+      case 'uploads.files':
+      case 'uploads.chunks':
+        normalizeIdField('_id');
+        break;
+      default:
+        break;
+    }
+
+    if (collectionName === 'works') {
+      normalizeIdField('executorOrganizationId');
+      normalizeIdField('clientId');
+    }
+
+    if (collectionName === 'files') {
+      normalizeIdField('bucketId');
+    }
+
+    if (collectionName === 'uploads.chunks') {
+      normalizeIdField('files_id');
+    }
+
+    if (collectionName === 'organizations' || collectionName === 'clients') {
+      normalizeIdArrayField('files');
+    }
+
+    return normalized;
+  }
+
+  private toObjectIdMaybe(value: unknown, unwrapNested = false): unknown {
+    if (value instanceof ObjectId) {
+      return value;
+    }
+
+    if (typeof value === 'string' && ObjectId.isValid(value)) {
+      return new ObjectId(value);
+    }
+
+    // Legacy backups could carry populated relations like { _id: "<hex>" }.
+    if (unwrapNested && value && typeof value === 'object' && !Array.isArray(value)) {
+      const candidate = value as { _id?: unknown; id?: unknown; $oid?: unknown };
+      if (typeof candidate.$oid === 'string' && ObjectId.isValid(candidate.$oid)) {
+        return new ObjectId(candidate.$oid);
+      }
+      if (typeof candidate._id === 'string' && ObjectId.isValid(candidate._id)) {
+        return new ObjectId(candidate._id);
+      }
+      if (typeof candidate.id === 'string' && ObjectId.isValid(candidate.id)) {
+        return new ObjectId(candidate.id);
+      }
+    }
+
+    return value;
   }
 
   private async rebuildSearchIndices(restoredByCollection: Map<string, Record<string, unknown>[]>) {
