@@ -17,6 +17,7 @@ export class OrganizationsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await this.organizationsRepository.ensureListingIndexes();
     const rows = await this.organizationsRepository.findAll();
     await Promise.all(
       rows.map((row) =>

@@ -17,6 +17,7 @@ export class ClientsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await this.clientsRepository.ensureListingIndexes();
     const rows = await this.clientsRepository.findAll();
     await Promise.all(
       rows.map((row) =>

@@ -18,6 +18,11 @@ export class WorksController {
     return this.worksService.findAll(query);
   }
 
+  @Get('reports/monthly-clients')
+  getMonthlyClientReport() {
+    return this.worksService.getMonthlyClientReport();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.worksService.findById(id);

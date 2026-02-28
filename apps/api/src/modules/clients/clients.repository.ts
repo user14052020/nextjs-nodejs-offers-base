@@ -51,6 +51,13 @@ export class ClientsRepository {
     return candidates;
   }
 
+  async ensureListingIndexes() {
+    await this.clientModel.collection.createIndex(
+      { createdAt: -1 },
+      { name: 'createdAt_-1' }
+    );
+  }
+
   async findAll() {
     return this.clientModel
       .find()

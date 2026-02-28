@@ -28,6 +28,26 @@ type WorkLineItem = {
   amount: number;
 };
 
+type MonthlyClientReportRow = {
+  clientId: string;
+  clientName: string;
+  worksCount: number;
+  totalAmount: number;
+};
+
+type MonthlyClientReportMonth = {
+  monthKey: string;
+  monthLabel: string;
+  totalWorks: number;
+  totalAmount: number;
+  clients: MonthlyClientReportRow[];
+};
+
+const monthLabelFormatter = new Intl.DateTimeFormat('ru-RU', {
+  month: 'long',
+  year: 'numeric'
+});
+
 @Injectable()
 export class WorksService implements OnModuleInit {
   private readonly logger = new Logger(WorksService.name);
@@ -43,6 +63,7 @@ export class WorksService implements OnModuleInit {
   async onModuleInit() {
     await this.worksRepository.backfillYears();
     await this.worksRepository.ensureYearlyNumberIndexes();
+    await this.worksRepository.ensureReportingIndexes();
     const rows = await this.worksRepository.findAll();
     for (const row of rows) {
       try {
@@ -67,6 +88,55 @@ export class WorksService implements OnModuleInit {
     }
 
     return this.worksRepository.findAll();
+  }
+
+  async getMonthlyClientReport(): Promise<MonthlyClientReportMonth[]> {
+    const rows = await this.worksRepository.aggregateMonthlyClientReport();
+    const monthMap = new Map<string, MonthlyClientReportMonth>();
+
+    for (const row of rows) {
+      const monthKey = `${row.year}-${String(row.month).padStart(2, '0')}`;
+      const existingMonth = monthMap.get(monthKey);
+      if (existingMonth) {
+        existingMonth.totalWorks += row.worksCount;
+        existingMonth.totalAmount += row.totalAmount;
+        existingMonth.clients.push({
+          clientId: row.clientId,
+          clientName: row.clientName,
+          worksCount: row.worksCount,
+          totalAmount: row.totalAmount
+        });
+        continue;
+      }
+
+      monthMap.set(monthKey, {
+        monthKey,
+        monthLabel: this.toMonthLabel(row.year, row.month),
+        totalWorks: row.worksCount,
+        totalAmount: row.totalAmount,
+        clients: [
+          {
+            clientId: row.clientId,
+            clientName: row.clientName,
+            worksCount: row.worksCount,
+            totalAmount: row.totalAmount
+          }
+        ]
+      });
+    }
+
+    return Array.from(monthMap.values()).map((month) => ({
+      ...month,
+      clients: month.clients.sort((left, right) => {
+        if (left.totalAmount !== right.totalAmount) {
+          return right.totalAmount - left.totalAmount;
+        }
+        if (left.worksCount !== right.worksCount) {
+          return right.worksCount - left.worksCount;
+        }
+        return left.clientName.localeCompare(right.clientName, 'ru-RU');
+      })
+    }));
   }
 
   async findById(id: string) {
@@ -1062,6 +1132,13 @@ export class WorksService implements OnModuleInit {
     }
 
     return false;
+  }
+
+  private toMonthLabel(year: number, month: number) {
+    const label = monthLabelFormatter
+      .format(new Date(Date.UTC(year, month - 1, 1)))
+      .replace(/\s?г\.$/u, '');
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   private async resolveWorkPartiesForDocuments(work: {

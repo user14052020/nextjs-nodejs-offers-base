@@ -54,6 +54,13 @@ export class OrganizationsRepository {
     return candidates;
   }
 
+  async ensureListingIndexes() {
+    await this.organizationModel.collection.createIndex(
+      { createdAt: -1 },
+      { name: 'createdAt_-1' }
+    );
+  }
+
   async findAll() {
     return this.organizationModel
       .find()

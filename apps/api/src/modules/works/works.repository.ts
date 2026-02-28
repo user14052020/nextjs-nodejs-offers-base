@@ -4,6 +4,15 @@ import { ClientSession, Model, Types } from 'mongoose';
 
 import { Work, WorkDocument } from './work.schema';
 
+export type MonthlyClientReportAggregateRow = {
+  year: number;
+  month: number;
+  clientId: string;
+  clientName: string;
+  worksCount: number;
+  totalAmount: number;
+};
+
 @Injectable()
 export class WorksRepository {
   constructor(@InjectModel(Work.name) private readonly workModel: Model<WorkDocument>) {}
@@ -77,6 +86,18 @@ export class WorksRepository {
     await this.workModel.collection.createIndex(
       { invoiceYear: 1, invoiceNumber: 1 },
       { unique: true, name: 'invoiceYear_1_invoiceNumber_1' }
+    );
+  }
+
+  async ensureReportingIndexes() {
+    await this.workModel.collection.createIndex(
+      { createdAt: -1 },
+      { name: 'createdAt_-1' }
+    );
+
+    await this.workModel.collection.createIndex(
+      { actDate: -1, clientId: 1 },
+      { name: 'actDate_-1_clientId_1' }
     );
   }
 
@@ -173,6 +194,76 @@ export class WorksRepository {
     ]);
 
     return result[0]?.value ?? 0;
+  }
+
+  async aggregateMonthlyClientReport(): Promise<MonthlyClientReportAggregateRow[]> {
+    return this.workModel.aggregate<MonthlyClientReportAggregateRow>([
+      {
+        $addFields: {
+          actDateParsed: {
+            $convert: { input: '$actDate', to: 'date', onError: null, onNull: null }
+          },
+          invoiceDateParsed: {
+            $convert: { input: '$invoiceDate', to: 'date', onError: null, onNull: null }
+          }
+        }
+      },
+      {
+        $addFields: {
+          reportDate: { $ifNull: ['$actDateParsed', '$invoiceDateParsed'] }
+        }
+      },
+      {
+        $match: {
+          reportDate: { $ne: null }
+        }
+      },
+      {
+        $project: {
+          year: { $year: '$reportDate' },
+          month: { $month: '$reportDate' },
+          clientId: '$clientId',
+          itemsCount: {
+            $cond: [{ $isArray: '$items' }, { $size: '$items' }, 0]
+          },
+          amount: { $convert: { input: '$amount', to: 'double', onError: 0, onNull: 0 } }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: '$year',
+            month: '$month',
+            clientId: '$clientId'
+          },
+          worksCount: { $sum: '$itemsCount' },
+          totalAmount: { $sum: '$amount' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'clients',
+          localField: '_id.clientId',
+          foreignField: '_id',
+          as: 'client'
+        }
+      },
+      { $unwind: { path: '$client', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          year: '$_id.year',
+          month: '$_id.month',
+          clientId: {
+            $ifNull: [{ $toString: '$_id.clientId' }, '__unknown_client__']
+          },
+          clientName: { $ifNull: ['$client.name', 'Клиент не найден'] },
+          worksCount: 1,
+          totalAmount: 1
+        }
+      },
+      { $sort: { year: -1, month: -1, totalAmount: -1, worksCount: -1, clientName: 1 } }
+    ]);
   }
 
   private unwrapCollectionResult<T>(result: T | { value?: T | null } | null | undefined): T | null {
