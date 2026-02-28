@@ -5,6 +5,7 @@ import { Alert, Button, Group, Paper, Stack, TextInput } from '@mantine/core';
 
 import { fetchOrganizations } from '@/entities/organization/api';
 import { Organization } from '@/entities/organization/types';
+import { CreateItemSection } from '@/features/create-item/CreateItemSection';
 import { OrganizationForm } from '@/features/organization/OrganizationForm';
 import { OrganizationsTable } from '@/widgets/organization/OrganizationsTable';
 
@@ -65,7 +66,9 @@ export default function OrganizationsPage() {
           </Group>
         </form>
       </Paper>
-      <OrganizationForm onSaved={handleSaved} editingItem={editingItem} onCancelEdit={() => setEditingItem(null)} />
+      <CreateItemSection createLabel="Новая организация" isEditing={Boolean(editingItem)}>
+        <OrganizationForm onSaved={handleSaved} editingItem={editingItem} onCancelEdit={() => setEditingItem(null)} />
+      </CreateItemSection>
       {error && <Alert color="red">{error}</Alert>}
       <OrganizationsTable items={items} onChange={() => load(activeQuery)} onEdit={setEditingItem} />
     </Stack>

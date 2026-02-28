@@ -7,6 +7,7 @@ import { fetchClients } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
 import { fetchOrganizations } from '@/entities/organization/api';
 import { Organization } from '@/entities/organization/types';
+import { CreateItemSection } from '@/features/create-item/CreateItemSection';
 import { fetchWorks } from '@/entities/work/api';
 import { Work } from '@/entities/work/types';
 import { WorkForm } from '@/features/work/WorkForm';
@@ -77,13 +78,15 @@ export default function WorksPage() {
           </Group>
         </form>
       </Paper>
-      <WorkForm
-        organizations={organizations}
-        clients={clients}
-        onSaved={handleSaved}
-        editingItem={editingItem}
-        onCancelEdit={() => setEditingItem(null)}
-      />
+      <CreateItemSection createLabel="Новая задача" isEditing={Boolean(editingItem)}>
+        <WorkForm
+          organizations={organizations}
+          clients={clients}
+          onSaved={handleSaved}
+          editingItem={editingItem}
+          onCancelEdit={() => setEditingItem(null)}
+        />
+      </CreateItemSection>
       {error && <Alert color="red">{error}</Alert>}
       <WorksTable
         items={works}

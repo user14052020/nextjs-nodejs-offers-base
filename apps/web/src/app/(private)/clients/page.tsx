@@ -5,6 +5,7 @@ import { Alert, Button, Group, Paper, Stack, TextInput } from '@mantine/core';
 
 import { fetchClients } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
+import { CreateItemSection } from '@/features/create-item/CreateItemSection';
 import { ClientForm } from '@/features/client/ClientForm';
 import { ClientsTable } from '@/widgets/client/ClientsTable';
 
@@ -65,7 +66,9 @@ export default function ClientsPage() {
           </Group>
         </form>
       </Paper>
-      <ClientForm onSaved={handleSaved} editingItem={editingItem} onCancelEdit={() => setEditingItem(null)} />
+      <CreateItemSection createLabel="Новый клиент" isEditing={Boolean(editingItem)}>
+        <ClientForm onSaved={handleSaved} editingItem={editingItem} onCancelEdit={() => setEditingItem(null)} />
+      </CreateItemSection>
       {error && <Alert color="red">{error}</Alert>}
       <ClientsTable items={items} onChange={() => load(activeQuery)} onEdit={setEditingItem} />
     </Stack>

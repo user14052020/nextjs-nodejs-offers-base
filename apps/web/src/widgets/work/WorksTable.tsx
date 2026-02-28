@@ -34,6 +34,25 @@ export const WorksTable: React.FC<{
     return '—';
   };
 
+  const formatDocumentDate = (work: Work) => {
+    const rawDate = work.actDate || work.invoiceDate;
+    if (!rawDate) {
+      return '—';
+    }
+
+    const plainDateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(rawDate);
+    if (plainDateMatch) {
+      return `${plainDateMatch[3]}.${plainDateMatch[2]}.${plainDateMatch[1]}`;
+    }
+
+    const parsedDate = new Date(rawDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return '—';
+    }
+
+    return parsedDate.toLocaleDateString('ru-RU');
+  };
+
   const handleDelete = async (id: string) => {
     setLoadingId(id);
     await deleteWork(id);
@@ -70,6 +89,7 @@ export const WorksTable: React.FC<{
         <Table striped highlightOnHover withTableBorder withColumnBorders>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th>Дата документа</Table.Th>
               <Table.Th>Позиции</Table.Th>
               <Table.Th>Организация</Table.Th>
               <Table.Th>Клиент</Table.Th>
@@ -89,6 +109,7 @@ export const WorksTable: React.FC<{
 
               return (
                 <Table.Tr key={work._id}>
+                  <Table.Td>{formatDocumentDate(work)}</Table.Td>
                   <Table.Td>{getWorkItemsText(work)}</Table.Td>
                   <Table.Td>{orgMap.get(work.executorOrganizationId) ?? '—'}</Table.Td>
                   <Table.Td>{clientMap.get(work.clientId) ?? '—'}</Table.Td>
