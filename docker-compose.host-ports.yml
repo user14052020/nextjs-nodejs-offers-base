@@ -1,0 +1,12 @@
+services:
+  mongo:
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  elasticsearch:
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
