@@ -1,6 +1,6 @@
 import { apiFetch } from '@/shared/api/http';
 
-import { MonthlyClientReportMonth } from './types';
+import { MonthlyClientReport } from './types';
 
-export const fetchMonthlyClientReport = () =>
-  apiFetch<MonthlyClientReportMonth[]>('/works/reports/monthly-clients');
+export const fetchMonthlyClientReport = (paidOnly: boolean) =>
+  apiFetch<MonthlyClientReport>(`/works/reports/monthly-clients?paidOnly=${paidOnly ? 'true' : 'false'}`);

@@ -5,7 +5,10 @@ import { Accordion, Badge, Group, Paper, ScrollArea, Stack, Table, Text, Title }
 
 import { MonthlyClientReportMonth } from '@/entities/report/types';
 
-export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMonth[] }> = ({ months }) => {
+export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMonth[]; paidOnly: boolean }> = ({
+  months,
+  paidOnly
+}) => {
   const formatAmount = (value: number) =>
     value.toLocaleString('ru-RU', {
       minimumFractionDigits: 2,
@@ -32,7 +35,8 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
         <div>
           <Title order={3}>Отчет по месяцам</Title>
           <Text size="sm" c="dimmed">
-            Учитываются только оплаченные документы. Клиенты отсортированы по убыванию суммы документов.
+            {paidOnly ? 'Учитываются только оплаченные документы.' : 'Учитываются все документы.'} Клиенты отсортированы
+            по убыванию суммы документов.
           </Text>
         </div>
 
@@ -45,6 +49,9 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                   <Group gap="xs">
                     <Badge variant="light" color="gray">
                       Работ: {month.totalWorks}
+                    </Badge>
+                    <Badge variant="light" color="dark">
+                      Оплачено: {month.paidWorksCount}
                     </Badge>
                     <Badge variant="light" color="dark">
                       Документы: {formatAmount(month.totalAmount)} ₽
@@ -64,6 +71,7 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                         <Table.Tr>
                           <Table.Th>Клиент</Table.Th>
                           <Table.Th>Количество работ</Table.Th>
+                          <Table.Th>Оплачено</Table.Th>
                           <Table.Th>Сумма документа</Table.Th>
                           <Table.Th>Сумма зачисления</Table.Th>
                           <Table.Th>Доля месяца</Table.Th>
@@ -77,6 +85,7 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                             <Table.Tr key={`${month.monthKey}-${client.clientId}`}>
                               <Table.Td>{client.clientName}</Table.Td>
                               <Table.Td>{client.worksCount}</Table.Td>
+                              <Table.Td>{client.paidWorksCount}</Table.Td>
                               <Table.Td>{formatAmount(client.totalAmount)} ₽</Table.Td>
                               <Table.Td>{formatAmount(client.totalCreditedAmount)} ₽</Table.Td>
                               <Table.Td>{formatPercent(share)}%</Table.Td>
@@ -89,6 +98,9 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                           </Table.Td>
                           <Table.Td>
                             <Text fw={700}>{month.totalWorks}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text fw={700}>{month.paidWorksCount}</Text>
                           </Table.Td>
                           <Table.Td>
                             <Text fw={700}>{formatAmount(month.totalAmount)} ₽</Text>

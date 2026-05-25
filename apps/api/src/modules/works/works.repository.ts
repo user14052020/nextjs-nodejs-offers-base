@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model, Types } from 'mongoose';
+import { ClientSession, Model, PipelineStage, Types } from 'mongoose';
 
 import { Work, WorkDocument } from './work.schema';
 
@@ -10,6 +10,7 @@ export type MonthlyClientReportAggregateRow = {
   clientId: string;
   clientName: string;
   worksCount: number;
+  paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
 };
@@ -208,13 +209,9 @@ export class WorksRepository {
     return result[0]?.value ?? 0;
   }
 
-  async aggregateMonthlyClientReport(): Promise<MonthlyClientReportAggregateRow[]> {
-    return this.workModel.aggregate<MonthlyClientReportAggregateRow>([
-      {
-        $match: {
-          isPayed: true
-        }
-      },
+  async aggregateMonthlyClientReport(options: { paidOnly: boolean }): Promise<MonthlyClientReportAggregateRow[]> {
+    const pipeline: PipelineStage[] = [
+      ...(options.paidOnly ? [{ $match: { isPayed: true } }] : []),
       {
         $addFields: {
           actDateParsed: {
@@ -243,6 +240,13 @@ export class WorksRepository {
           itemsCount: {
             $cond: [{ $isArray: '$items' }, { $size: '$items' }, 0]
           },
+          paidWorksCount: {
+            $cond: [
+              { $eq: ['$isPayed', true] },
+              { $cond: [{ $isArray: '$items' }, { $size: '$items' }, 0] },
+              0
+            ]
+          },
           amount: { $convert: { input: '$amount', to: 'double', onError: 0, onNull: 0 } },
           creditedAmount: {
             $convert: {
@@ -262,6 +266,7 @@ export class WorksRepository {
             clientId: '$clientId'
           },
           worksCount: { $sum: '$itemsCount' },
+          paidWorksCount: { $sum: '$paidWorksCount' },
           totalAmount: { $sum: '$amount' },
           totalCreditedAmount: { $sum: '$creditedAmount' }
         }
@@ -285,12 +290,15 @@ export class WorksRepository {
           },
           clientName: { $ifNull: ['$client.name', 'Клиент не найден'] },
           worksCount: 1,
+          paidWorksCount: 1,
           totalAmount: 1,
           totalCreditedAmount: 1
         }
       },
       { $sort: { year: -1, month: -1, totalAmount: -1, worksCount: -1, clientName: 1 } }
-    ]);
+    ];
+
+    return this.workModel.aggregate<MonthlyClientReportAggregateRow>(pipeline);
   }
 
   private unwrapCollectionResult<T>(result: T | { value?: T | null } | null | undefined): T | null {

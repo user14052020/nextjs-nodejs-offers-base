@@ -19,8 +19,8 @@ export class WorksController {
   }
 
   @Get('reports/monthly-clients')
-  getMonthlyClientReport() {
-    return this.worksService.getMonthlyClientReport();
+  getMonthlyClientReport(@Query('paidOnly') paidOnly?: string) {
+    return this.worksService.getMonthlyClientReport(paidOnly !== 'false');
   }
 
   @Get(':id')

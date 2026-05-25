@@ -38,6 +38,14 @@ type MonthlyClientReportRow = {
   clientId: string;
   clientName: string;
   worksCount: number;
+  paidWorksCount: number;
+  totalAmount: number;
+  totalCreditedAmount: number;
+};
+
+type MonthlyClientReportSummary = {
+  totalWorks: number;
+  paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
 };
@@ -46,9 +54,16 @@ type MonthlyClientReportMonth = {
   monthKey: string;
   monthLabel: string;
   totalWorks: number;
+  paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
   clients: MonthlyClientReportRow[];
+};
+
+type MonthlyClientReport = {
+  paidOnly: boolean;
+  summary: MonthlyClientReportSummary;
+  months: MonthlyClientReportMonth[];
 };
 
 const monthLabelFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -99,21 +114,34 @@ export class WorksService implements OnModuleInit {
     return this.worksRepository.findAll();
   }
 
-  async getMonthlyClientReport(): Promise<MonthlyClientReportMonth[]> {
-    const rows = await this.worksRepository.aggregateMonthlyClientReport();
+  async getMonthlyClientReport(paidOnly = true): Promise<MonthlyClientReport> {
+    const rows = await this.worksRepository.aggregateMonthlyClientReport({ paidOnly });
     const monthMap = new Map<string, MonthlyClientReportMonth>();
+    const summary: MonthlyClientReportSummary = {
+      totalWorks: 0,
+      paidWorksCount: 0,
+      totalAmount: 0,
+      totalCreditedAmount: 0
+    };
 
     for (const row of rows) {
+      summary.totalWorks += row.worksCount;
+      summary.paidWorksCount += row.paidWorksCount;
+      summary.totalAmount += row.totalAmount;
+      summary.totalCreditedAmount += row.totalCreditedAmount;
+
       const monthKey = `${row.year}-${String(row.month).padStart(2, '0')}`;
       const existingMonth = monthMap.get(monthKey);
       if (existingMonth) {
         existingMonth.totalWorks += row.worksCount;
+        existingMonth.paidWorksCount += row.paidWorksCount;
         existingMonth.totalAmount += row.totalAmount;
         existingMonth.totalCreditedAmount += row.totalCreditedAmount;
         existingMonth.clients.push({
           clientId: row.clientId,
           clientName: row.clientName,
           worksCount: row.worksCount,
+          paidWorksCount: row.paidWorksCount,
           totalAmount: row.totalAmount,
           totalCreditedAmount: row.totalCreditedAmount
         });
@@ -124,6 +152,7 @@ export class WorksService implements OnModuleInit {
         monthKey,
         monthLabel: this.toMonthLabel(row.year, row.month),
         totalWorks: row.worksCount,
+        paidWorksCount: row.paidWorksCount,
         totalAmount: row.totalAmount,
         totalCreditedAmount: row.totalCreditedAmount,
         clients: [
@@ -131,6 +160,7 @@ export class WorksService implements OnModuleInit {
             clientId: row.clientId,
             clientName: row.clientName,
             worksCount: row.worksCount,
+            paidWorksCount: row.paidWorksCount,
             totalAmount: row.totalAmount,
             totalCreditedAmount: row.totalCreditedAmount
           }
@@ -138,18 +168,22 @@ export class WorksService implements OnModuleInit {
       });
     }
 
-    return Array.from(monthMap.values()).map((month) => ({
-      ...month,
-      clients: month.clients.sort((left, right) => {
-        if (left.totalAmount !== right.totalAmount) {
-          return right.totalAmount - left.totalAmount;
-        }
-        if (left.worksCount !== right.worksCount) {
-          return right.worksCount - left.worksCount;
-        }
-        return left.clientName.localeCompare(right.clientName, 'ru-RU');
-      })
-    }));
+    return {
+      paidOnly,
+      summary,
+      months: Array.from(monthMap.values()).map((month) => ({
+        ...month,
+        clients: month.clients.sort((left, right) => {
+          if (left.totalAmount !== right.totalAmount) {
+            return right.totalAmount - left.totalAmount;
+          }
+          if (left.worksCount !== right.worksCount) {
+            return right.worksCount - left.worksCount;
+          }
+          return left.clientName.localeCompare(right.clientName, 'ru-RU');
+        })
+      }))
+    };
   }
 
   async findById(id: string) {
