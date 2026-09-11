@@ -23,8 +23,7 @@ export default function ReportPage() {
     try {
       setError(null);
       setIsLoading(true);
-      const reportData = await fetchMonthlyClientReport(paidOnly);
-      setReport(reportData);
+      setReport(await fetchMonthlyClientReport(paidOnly));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка загрузки отчета');
     } finally {
@@ -44,13 +43,13 @@ export default function ReportPage() {
             <Stack gap={4}>
               <Title order={2}>Отчет</Title>
               <Text size="sm" c="dimmed">
-                Аналитика по месяцам: количество работ, сумма документов и сумма зачислений по клиентам.
+                Сводная книга доходов: прямые счета/акты и отдельные поступления с площадок.
               </Text>
             </Stack>
             <Switch
               checked={paidOnly}
               color="dark"
-              label="Только оплаченные"
+              label="Только полученные"
               onChange={(event) => setPaidOnly(event.currentTarget.checked)}
             />
           </Group>
@@ -58,16 +57,19 @@ export default function ReportPage() {
           {report && (
             <Group gap="xs" wrap="wrap">
               <Badge variant="light" color="gray">
-                Работ: {report.summary.totalWorks}
+                Записей: {report.summary.totalWorks}
               </Badge>
               <Badge variant="light" color="dark">
-                Оплачено: {report.summary.paidWorksCount}
+                Получено: {report.summary.paidWorksCount}
               </Badge>
               <Badge variant="light" color="gray">
-                Документы: {formatAmount(report.summary.totalAmount)} ₽
+                Доход: {formatAmount(report.summary.totalAmount)} ₽
               </Badge>
               <Badge variant="light" color="gray">
-                Зачисления: {formatAmount(report.summary.totalCreditedAmount)} ₽
+                На счет: {formatAmount(report.summary.totalCreditedAmount)} ₽
+              </Badge>
+              <Badge variant="light" color="gray">
+                Комиссия: {formatAmount(report.summary.totalPlatformCommission + report.summary.totalPayoutCommission)} ₽
               </Badge>
             </Group>
           )}

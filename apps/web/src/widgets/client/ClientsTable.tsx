@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Alert, Button, Group, Paper, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Badge, Button, Group, Paper, Stack, Table, Text, Title } from '@mantine/core';
 
 import { Client } from '@/entities/client/types';
 import { deleteClient, deleteClientFile, uploadClientFiles } from '@/entities/client/api';
@@ -141,6 +141,7 @@ export const ClientsTable: React.FC<{
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Название</Table.Th>
+              <Table.Th>Тип</Table.Th>
               <Table.Th>ИНН</Table.Th>
               <Table.Th>Банк</Table.Th>
               <Table.Th>Договор</Table.Th>
@@ -152,6 +153,11 @@ export const ClientsTable: React.FC<{
             {items.map((client) => (
               <Table.Tr key={client._id}>
                 <Table.Td>{client.name}</Table.Td>
+                <Table.Td>
+                  <Badge variant="light" color={client.isPhysicalPerson ? 'dark' : 'gray'}>
+                    {client.isPhysicalPerson ? 'Физлицо' : 'Организация'}
+                  </Badge>
+                </Table.Td>
                 <Table.Td>{client.inn || '—'}</Table.Td>
                 <Table.Td>{client.bankName || '—'}</Table.Td>
                 <Table.Td>{client.contract || '—'}</Table.Td>

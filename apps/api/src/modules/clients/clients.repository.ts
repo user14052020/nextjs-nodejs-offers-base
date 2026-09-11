@@ -56,6 +56,10 @@ export class ClientsRepository {
       { createdAt: -1 },
       { name: 'createdAt_-1' }
     );
+    await this.clientModel.collection.createIndex(
+      { inn: 1, kpp: 1 },
+      { name: 'inn_1_kpp_1' }
+    );
   }
 
   async findAll() {
@@ -106,6 +110,15 @@ export class ClientsRepository {
     const hydrated = this.clientModel.hydrate(raw);
     await this.clientModel.populate(hydrated, ClientsRepository.filePopulate);
     return hydrated;
+  }
+
+  async findByTaxIds(inn: string, kpp?: string) {
+    return this.clientModel
+      .findOne({
+        inn,
+        ...(kpp ? { kpp } : {})
+      })
+      .exec();
   }
 
   async create(payload: Partial<Client>, session?: ClientSession) {

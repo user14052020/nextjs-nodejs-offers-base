@@ -1,5 +1,6 @@
 services:
   mongo:
+    restart: unless-stopped
     image: mongo:6
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet"]
     expose:
@@ -21,6 +22,7 @@ services:
       ]
 
   redis:
+    restart: unless-stopped
     image: redis:7
     expose:
       - "6379"
@@ -28,6 +30,7 @@ services:
       - redis_data:/data
 
   elasticsearch:
+    restart: unless-stopped
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
     environment:
       - discovery.type=single-node
@@ -50,7 +53,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=3201
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/offers-base?replicaSet=rs0}
       - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
       - JWT_SECRET=${JWT_SECRET:-change-me}
@@ -65,23 +68,24 @@ services:
       elasticsearch:
         condition: service_healthy
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "${API_PORT:-3201}:3201"
 
   web:
+    restart: unless-stopped
     build:
       context: ./apps/web
       args:
-        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:3001}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:3201}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3201}
     environment:
-      - API_INTERNAL_URL=http://api:3001
+      - API_INTERNAL_URL=http://api:3201
       - NODE_ENV=production
-      - PORT=3000
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      - PORT=3200
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3201}
     depends_on:
       - api
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3200}:3200"
 
 volumes:
   mongo_data:

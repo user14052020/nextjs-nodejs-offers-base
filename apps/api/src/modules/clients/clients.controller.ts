@@ -7,11 +7,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Types } from 'mongoose';
 import { ValidationServiceException } from '../../common/errors/service.exception';
 
@@ -45,6 +46,17 @@ export class ClientsController {
   @Roles('admin')
   create(@Body() dto: CreateClientDto) {
     return this.clientsService.create(dto);
+  }
+
+  @Post('imports/company-card')
+  @Roles('admin')
+  @UseInterceptors(FileInterceptor('file'))
+  createFromCompanyCard(@UploadedFile() file?: Express.Multer.File) {
+    if (!file?.buffer?.length) {
+      throw new ValidationServiceException('Файл реквизитов не передан');
+    }
+
+    return this.clientsService.createFromCompanyCard(file.buffer);
   }
 
   @Patch(':id')

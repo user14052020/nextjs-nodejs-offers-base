@@ -3,6 +3,7 @@ import { StoredFile } from '@/shared/types/file';
 export type Client = {
   _id: string;
   name: string;
+  isPhysicalPerson?: boolean;
   inn?: string;
   kpp?: string;
   bankAccount?: string;

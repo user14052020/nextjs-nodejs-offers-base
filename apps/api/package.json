@@ -18,6 +18,7 @@
     "@nestjs/passport": "10.0.3",
     "@nestjs/platform-express": "10.3.0",
     "@elastic/elasticsearch": "8.15.1",
+    "adm-zip": "0.5.16",
     "bcrypt": "5.1.1",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.1",
@@ -28,7 +29,8 @@
     "passport-local": "1.0.0",
     "pdfkit": "0.15.0",
     "reflect-metadata": "0.1.14",
-    "rxjs": "7.8.1"
+    "rxjs": "7.8.1",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@nestjs/cli": "10.3.0",

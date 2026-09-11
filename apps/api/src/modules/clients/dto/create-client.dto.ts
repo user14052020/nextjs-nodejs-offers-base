@@ -1,9 +1,13 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateClientDto {
   @IsString()
   @MinLength(2)
   name: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPhysicalPerson?: boolean;
 
   @IsOptional()
   @IsString()

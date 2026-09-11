@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Button, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, Checkbox, Group, Paper, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 
 import { createClient, updateClient } from '@/entities/client/api';
 import { Client } from '@/entities/client/types';
@@ -10,6 +10,7 @@ import { Field } from '@/shared/ui/Field';
 
 const EMPTY_FORM = {
   name: '',
+  isPhysicalPerson: false,
   inn: '',
   kpp: '',
   bankAccount: '',
@@ -41,6 +42,7 @@ export const ClientForm: React.FC<{
 
     setForm({
       name: editingItem.name || '',
+      isPhysicalPerson: Boolean(editingItem.isPhysicalPerson),
       inn: editingItem.inn || '',
       kpp: editingItem.kpp || '',
       bankAccount: editingItem.bankAccount || '',
@@ -85,6 +87,13 @@ export const ClientForm: React.FC<{
         <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           <Field label="Название">
             <TextInput value={form.name} onChange={(event) => handleChange('name', event.currentTarget.value)} />
+          </Field>
+          <Field label="Тип клиента">
+            <Checkbox
+              label="Это физлицо"
+              checked={form.isPhysicalPerson}
+              onChange={(event) => setForm((prev) => ({ ...prev, isPhysicalPerson: event.currentTarget.checked }))}
+            />
           </Field>
           <Field label="ИНН">
             <TextInput value={form.inn} onChange={(event) => handleChange('inn', event.currentTarget.value)} />

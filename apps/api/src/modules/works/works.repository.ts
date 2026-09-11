@@ -15,6 +15,12 @@ export type MonthlyClientReportAggregateRow = {
   totalCreditedAmount: number;
 };
 
+export type WorkListRow = Work & {
+  _id: Types.ObjectId | string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+};
+
 @Injectable()
 export class WorksRepository {
   constructor(@InjectModel(Work.name) private readonly workModel: Model<WorkDocument>) {}
@@ -61,8 +67,53 @@ export class WorksRepository {
       [
         {
           $set: {
-            actYear: { $year: '$actDate' },
-            invoiceYear: { $year: '$invoiceDate' }
+            __actDateParsed: {
+              $convert: { input: '$actDate', to: 'date', onError: null, onNull: null }
+            },
+            __invoiceDateParsed: {
+              $convert: { input: '$invoiceDate', to: 'date', onError: null, onNull: null }
+            }
+          }
+        },
+        {
+          $set: {
+            actYear: {
+              $cond: [{ $ne: ['$__actDateParsed', null] }, { $year: '$__actDateParsed' }, '$actYear']
+            },
+            invoiceYear: {
+              $cond: [{ $ne: ['$__invoiceDateParsed', null] }, { $year: '$__invoiceDateParsed' }, '$invoiceYear']
+            }
+          }
+        },
+        {
+          $unset: ['__actDateParsed', '__invoiceDateParsed']
+        }
+      ]
+    );
+  }
+
+  async backfillDocumentDates() {
+    await this.workModel.updateMany(
+      {
+        $or: [{ actDate: { $type: 'string' } }, { invoiceDate: { $type: 'string' } }]
+      },
+      [
+        {
+          $set: {
+            actDate: {
+              $cond: [
+                { $eq: [{ $type: '$actDate' }, 'string'] },
+                { $convert: { input: '$actDate', to: 'date', onError: '$actDate', onNull: '$actDate' } },
+                '$actDate'
+              ]
+            },
+            invoiceDate: {
+              $cond: [
+                { $eq: [{ $type: '$invoiceDate' }, 'string'] },
+                { $convert: { input: '$invoiceDate', to: 'date', onError: '$invoiceDate', onNull: '$invoiceDate' } },
+                '$invoiceDate'
+              ]
+            }
           }
         }
       ]
@@ -114,8 +165,38 @@ export class WorksRepository {
     );
   }
 
-  async findAll() {
-    return this.workModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(): Promise<WorkListRow[]> {
+    return this.workModel
+      .aggregate<WorkListRow>([
+        {
+          $addFields: {
+            __documentDateSort: {
+              $ifNull: [
+                { $convert: { input: '$actDate', to: 'date', onError: null, onNull: null } },
+                { $convert: { input: '$invoiceDate', to: 'date', onError: null, onNull: null } }
+              ]
+            },
+            __invoiceDateSort: {
+              $convert: { input: '$invoiceDate', to: 'date', onError: null, onNull: null }
+            },
+            __createdAtSort: {
+              $convert: { input: '$createdAt', to: 'date', onError: null, onNull: null }
+            }
+          }
+        },
+        {
+          $sort: {
+            __documentDateSort: -1,
+            __invoiceDateSort: -1,
+            __createdAtSort: -1,
+            _id: -1
+          }
+        },
+        {
+          $unset: ['__documentDateSort', '__invoiceDateSort', '__createdAtSort']
+        }
+      ])
+      .exec();
   }
 
   async findByIds(ids: string[]) {
@@ -130,6 +211,15 @@ export class WorksRepository {
 
     const raw = await this.workModel.collection.findOne(this.rawIdFilter(id));
     return raw ? this.workModel.hydrate(raw) : null;
+  }
+
+  async findDuplicateImportCandidates(payload: { documentDate: Date; itemName: string }) {
+    return this.workModel
+      .find({
+        $or: [{ actDate: payload.documentDate }, { invoiceDate: payload.documentDate }],
+        'items.name': payload.itemName
+      })
+      .exec();
   }
 
   async create(payload: Partial<Work>, session?: ClientSession) {

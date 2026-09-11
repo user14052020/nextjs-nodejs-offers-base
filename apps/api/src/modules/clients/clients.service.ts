@@ -2,8 +2,9 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Types } from 'mongoose';
 
 import { SearchService } from '../../common/search/search.service';
-import { NotFoundServiceException } from '../../common/errors/service.exception';
+import { ConflictServiceException, NotFoundServiceException } from '../../common/errors/service.exception';
 import { UnitOfWork } from '../../common/uow/unit-of-work';
+import { ClientCompanyCardParserService } from './client-company-card-parser.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { ClientsRepository } from './clients.repository';
@@ -13,6 +14,7 @@ export class ClientsService implements OnModuleInit {
   constructor(
     private readonly clientsRepository: ClientsRepository,
     private readonly searchService: SearchService,
+    private readonly clientCompanyCardParserService: ClientCompanyCardParserService,
     private readonly uow: UnitOfWork
   ) {}
 
@@ -81,6 +83,18 @@ export class ClientsService implements OnModuleInit {
     });
 
     return created;
+  }
+
+  async createFromCompanyCard(buffer: Buffer) {
+    const dto = this.clientCompanyCardParserService.parse(buffer);
+    if (dto.inn) {
+      const existing = await this.clientsRepository.findByTaxIds(dto.inn, dto.kpp);
+      if (existing) {
+        throw new ConflictServiceException('Клиент с таким ИНН/КПП уже существует');
+      }
+    }
+
+    return this.create(dto);
   }
 
   async update(id: string, dto: UpdateClientDto) {

@@ -8,6 +8,9 @@ export class Client {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ default: false })
+  isPhysicalPerson: boolean;
+
   @Prop()
   inn?: string;
 

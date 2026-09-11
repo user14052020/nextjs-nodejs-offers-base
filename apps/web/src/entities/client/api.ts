@@ -5,6 +5,11 @@ export const fetchClients = (query?: string) =>
   apiFetch<Client[]>(query?.trim() ? `/clients?q=${encodeURIComponent(query.trim())}` : '/clients');
 export const createClient = (payload: Partial<Client>) =>
   apiFetch<Client>('/clients', { method: 'POST', body: JSON.stringify(payload) });
+export const importClientCompanyCard = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiFetch<Client>('/clients/imports/company-card', { method: 'POST', body: formData });
+};
 export const updateClient = (id: string, payload: Partial<Client>) =>
   apiFetch<Client>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 export const deleteClient = (id: string) => apiFetch(`/clients/${id}`, { method: 'DELETE' });

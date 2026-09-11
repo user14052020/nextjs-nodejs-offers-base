@@ -5,7 +5,7 @@ import { Alert, Button, Group, Paper, Stack, Switch, Table, Text, Title } from '
 
 import { Client } from '@/entities/client/types';
 import { Organization } from '@/entities/organization/types';
-import { actPdfUrl, deleteWork, invoicePdfUrl, updateWork } from '@/entities/work/api';
+import { actPdfUrl, deleteWork, invoicePdfUrl, updPdfUrl, updateWork } from '@/entities/work/api';
 import { Work } from '@/entities/work/types';
 import { fetchBlob } from '@/shared/api/http';
 
@@ -125,8 +125,7 @@ export const WorksTable: React.FC<{
               <Table.Th>Позиции</Table.Th>
               <Table.Th>Организация</Table.Th>
               <Table.Th>Клиент</Table.Th>
-              <Table.Th>Акт</Table.Th>
-              <Table.Th>Счет</Table.Th>
+              <Table.Th>Документы</Table.Th>
               <Table.Th>Сумма документа</Table.Th>
               <Table.Th>Сумма зачисления</Table.Th>
               <Table.Th>Оплачено</Table.Th>
@@ -149,28 +148,38 @@ export const WorksTable: React.FC<{
                   <Table.Td>{orgMap.get(work.executorOrganizationId) ?? '—'}</Table.Td>
                   <Table.Td>{clientMap.get(work.clientId) ?? '—'}</Table.Td>
                   <Table.Td>
-                    <Button
-                      variant="light"
-                      color="gray"
-                      size="xs"
-                      disabled={hasMissingLinks}
-                      title={hasMissingLinks ? missingLinksHint : undefined}
-                      onClick={() => openPdf(withCacheBust(actPdfUrl(work._id)))}
-                    >
-                      АКТ {work.actNumber}
-                    </Button>
-                  </Table.Td>
-                  <Table.Td>
-                    <Button
-                      variant="light"
-                      color="gray"
-                      size="xs"
-                      disabled={hasMissingLinks}
-                      title={hasMissingLinks ? missingLinksHint : undefined}
-                      onClick={() => openPdf(withCacheBust(invoicePdfUrl(work._id)))}
-                    >
-                      СЧЕТ {work.invoiceNumber}
-                    </Button>
+                    <Group gap={6} wrap="wrap">
+                      <Button
+                        variant="light"
+                        color="gray"
+                        size="xs"
+                        disabled={hasMissingLinks}
+                        title={hasMissingLinks ? missingLinksHint : undefined}
+                        onClick={() => openPdf(withCacheBust(actPdfUrl(work._id)))}
+                      >
+                        АКТ {work.actNumber}
+                      </Button>
+                      <Button
+                        variant="light"
+                        color="gray"
+                        size="xs"
+                        disabled={hasMissingLinks}
+                        title={hasMissingLinks ? missingLinksHint : undefined}
+                        onClick={() => openPdf(withCacheBust(invoicePdfUrl(work._id)))}
+                      >
+                        СЧЕТ {work.invoiceNumber}
+                      </Button>
+                      <Button
+                        variant="light"
+                        color="gray"
+                        size="xs"
+                        disabled={hasMissingLinks}
+                        title={hasMissingLinks ? missingLinksHint : undefined}
+                        onClick={() => openPdf(withCacheBust(updPdfUrl(work._id)))}
+                      >
+                        УПД {work.invoiceNumber}
+                      </Button>
+                    </Group>
                   </Table.Td>
                   <Table.Td>
                     {formatAmount(work.amount)} {work.currency || 'RUB'}

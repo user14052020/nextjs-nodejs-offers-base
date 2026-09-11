@@ -11,3 +11,4 @@ export const deleteWork = (id: string) => apiFetch(`/works/${id}`, { method: 'DE
 
 export const actPdfUrl = (id: string) => getApiPath(`/works/${id}/act.pdf`);
 export const invoicePdfUrl = (id: string) => getApiPath(`/works/${id}/invoice.pdf`);
+export const updPdfUrl = (id: string) => getApiPath(`/works/${id}/upd.pdf`);

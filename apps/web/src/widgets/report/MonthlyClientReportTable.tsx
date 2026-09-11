@@ -21,6 +21,12 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
       maximumFractionDigits: 1
     });
 
+  const sourceLabel = (source: string) => {
+    if (source === 'document') return 'Счет/акт';
+    if (source === 'kwork') return 'Kwork';
+    return 'Доход';
+  };
+
   if (months.length === 0) {
     return (
       <Paper withBorder shadow="sm" radius="lg" p="xl">
@@ -33,10 +39,10 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
     <Paper withBorder shadow="sm" radius="lg" p="xl">
       <Stack gap="md">
         <div>
-          <Title order={3}>Отчет по месяцам</Title>
+          <Title order={3}>Книга доходов по месяцам</Title>
           <Text size="sm" c="dimmed">
-            {paidOnly ? 'Учитываются только оплаченные документы.' : 'Учитываются все документы.'} Клиенты отсортированы
-            по убыванию суммы документов.
+            {paidOnly ? 'Учитываются только полученные доходы.' : 'Учитываются все записи.'} Счета/акты и доходы
+            площадок сведены в один отчет, но остаются разными источниками.
           </Text>
         </div>
 
@@ -48,16 +54,19 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                   <Text fw={600}>{month.monthLabel}</Text>
                   <Group gap="xs">
                     <Badge variant="light" color="gray">
-                      Работ: {month.totalWorks}
+                      Записей: {month.totalWorks}
                     </Badge>
                     <Badge variant="light" color="dark">
-                      Оплачено: {month.paidWorksCount}
+                      Получено: {month.paidWorksCount}
                     </Badge>
                     <Badge variant="light" color="dark">
-                      Документы: {formatAmount(month.totalAmount)} ₽
+                      Доход: {formatAmount(month.totalAmount)} ₽
                     </Badge>
                     <Badge variant="light" color="gray">
-                      Зачисления: {formatAmount(month.totalCreditedAmount)} ₽
+                      На счет: {formatAmount(month.totalCreditedAmount)} ₽
+                    </Badge>
+                    <Badge variant="light" color="gray">
+                      Комиссия: {formatAmount(month.totalPlatformCommission + month.totalPayoutCommission)} ₽
                     </Badge>
                   </Group>
                 </Group>
@@ -69,31 +78,40 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                     <Table striped highlightOnHover withTableBorder withColumnBorders>
                       <Table.Thead>
                         <Table.Tr>
-                          <Table.Th>Клиент</Table.Th>
-                          <Table.Th>Количество работ</Table.Th>
-                          <Table.Th>Оплачено</Table.Th>
-                          <Table.Th>Сумма документа</Table.Th>
-                          <Table.Th>Сумма зачисления</Table.Th>
+                          <Table.Th>Источник</Table.Th>
+                          <Table.Th>Клиент / покупатель</Table.Th>
+                          <Table.Th>Записей</Table.Th>
+                          <Table.Th>Получено</Table.Th>
+                          <Table.Th>Доход</Table.Th>
+                          <Table.Th>На счет</Table.Th>
+                          <Table.Th>Комиссия</Table.Th>
                           <Table.Th>Доля месяца</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
                         {month.clients.map((client) => {
                           const share = month.totalAmount > 0 ? (client.totalAmount / month.totalAmount) * 100 : 0;
+                          const commission = client.totalPlatformCommission + client.totalPayoutCommission;
 
                           return (
                             <Table.Tr key={`${month.monthKey}-${client.clientId}`}>
+                              <Table.Td>
+                                <Badge variant="light" color={client.source === 'document' ? 'gray' : 'dark'}>
+                                  {sourceLabel(client.source)}
+                                </Badge>
+                              </Table.Td>
                               <Table.Td>{client.clientName}</Table.Td>
                               <Table.Td>{client.worksCount}</Table.Td>
                               <Table.Td>{client.paidWorksCount}</Table.Td>
                               <Table.Td>{formatAmount(client.totalAmount)} ₽</Table.Td>
                               <Table.Td>{formatAmount(client.totalCreditedAmount)} ₽</Table.Td>
+                              <Table.Td>{formatAmount(commission)} ₽</Table.Td>
                               <Table.Td>{formatPercent(share)}%</Table.Td>
                             </Table.Tr>
                           );
                         })}
                         <Table.Tr>
-                          <Table.Td>
+                          <Table.Td colSpan={2}>
                             <Text fw={700}>Итого за месяц</Text>
                           </Table.Td>
                           <Table.Td>
@@ -109,16 +127,17 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                             <Text fw={700}>{formatAmount(month.totalCreditedAmount)} ₽</Text>
                           </Table.Td>
                           <Table.Td>
+                            <Text fw={700}>
+                              {formatAmount(month.totalPlatformCommission + month.totalPayoutCommission)} ₽
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
                             <Text fw={700}>100,0%</Text>
                           </Table.Td>
                         </Table.Tr>
                       </Table.Tbody>
                     </Table>
                   </ScrollArea>
-                  <Text size="sm" c="dimmed">
-                    Документы за {month.monthLabel.toLowerCase()}: {formatAmount(month.totalAmount)} ₽. Зачисления:{' '}
-                    {formatAmount(month.totalCreditedAmount)} ₽
-                  </Text>
                 </Stack>
               </Accordion.Panel>
             </Accordion.Item>

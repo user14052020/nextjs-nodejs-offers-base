@@ -11,9 +11,11 @@ import {
 } from '../../common/errors/service.exception';
 import { UnitOfWork } from '../../common/uow/unit-of-work';
 import { ClientsService } from '../clients/clients.service';
+import { IncomesService } from '../incomes/incomes.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
+import { WorkUpdPdfService } from './work-upd-pdf.service';
 import { WorksRepository } from './works.repository';
 
 type PdfFonts = {
@@ -37,10 +39,13 @@ type PdfTableMeasurementCell = {
 type MonthlyClientReportRow = {
   clientId: string;
   clientName: string;
+  source: 'document' | 'kwork' | 'manual';
   worksCount: number;
   paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
+  totalPlatformCommission: number;
+  totalPayoutCommission: number;
 };
 
 type MonthlyClientReportSummary = {
@@ -48,6 +53,8 @@ type MonthlyClientReportSummary = {
   paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
+  totalPlatformCommission: number;
+  totalPayoutCommission: number;
 };
 
 type MonthlyClientReportMonth = {
@@ -57,6 +64,8 @@ type MonthlyClientReportMonth = {
   paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
+  totalPlatformCommission: number;
+  totalPayoutCommission: number;
   clients: MonthlyClientReportRow[];
 };
 
@@ -79,11 +88,14 @@ export class WorksService implements OnModuleInit {
     private readonly worksRepository: WorksRepository,
     private readonly organizationsService: OrganizationsService,
     private readonly clientsService: ClientsService,
+    private readonly incomesService: IncomesService,
+    private readonly workUpdPdfService: WorkUpdPdfService,
     private readonly searchService: SearchService,
     private readonly uow: UnitOfWork
   ) {}
 
   async onModuleInit() {
+    await this.worksRepository.backfillDocumentDates();
     await this.worksRepository.backfillYears();
     await this.worksRepository.backfillPaymentStatus();
     await this.worksRepository.ensureYearlyNumberIndexes();
@@ -115,20 +127,39 @@ export class WorksService implements OnModuleInit {
   }
 
   async getMonthlyClientReport(paidOnly = true): Promise<MonthlyClientReport> {
-    const rows = await this.worksRepository.aggregateMonthlyClientReport({ paidOnly });
+    const [rows, incomeRows] = await Promise.all([
+      this.worksRepository.aggregateMonthlyClientReport({ paidOnly }),
+      this.incomesService.aggregateMonthlyReport({ receivedOnly: paidOnly })
+    ]);
     const monthMap = new Map<string, MonthlyClientReportMonth>();
     const summary: MonthlyClientReportSummary = {
       totalWorks: 0,
       paidWorksCount: 0,
       totalAmount: 0,
-      totalCreditedAmount: 0
+      totalCreditedAmount: 0,
+      totalPlatformCommission: 0,
+      totalPayoutCommission: 0
     };
 
-    for (const row of rows) {
+    const pushRow = (row: {
+      year: number;
+      month: number;
+      clientId: string;
+      clientName: string;
+      source: 'document' | 'kwork' | 'manual';
+      worksCount: number;
+      paidWorksCount: number;
+      totalAmount: number;
+      totalCreditedAmount: number;
+      totalPlatformCommission: number;
+      totalPayoutCommission: number;
+    }) => {
       summary.totalWorks += row.worksCount;
       summary.paidWorksCount += row.paidWorksCount;
       summary.totalAmount += row.totalAmount;
       summary.totalCreditedAmount += row.totalCreditedAmount;
+      summary.totalPlatformCommission += row.totalPlatformCommission;
+      summary.totalPayoutCommission += row.totalPayoutCommission;
 
       const monthKey = `${row.year}-${String(row.month).padStart(2, '0')}`;
       const existingMonth = monthMap.get(monthKey);
@@ -137,15 +168,20 @@ export class WorksService implements OnModuleInit {
         existingMonth.paidWorksCount += row.paidWorksCount;
         existingMonth.totalAmount += row.totalAmount;
         existingMonth.totalCreditedAmount += row.totalCreditedAmount;
+        existingMonth.totalPlatformCommission += row.totalPlatformCommission;
+        existingMonth.totalPayoutCommission += row.totalPayoutCommission;
         existingMonth.clients.push({
           clientId: row.clientId,
           clientName: row.clientName,
+          source: row.source,
           worksCount: row.worksCount,
           paidWorksCount: row.paidWorksCount,
           totalAmount: row.totalAmount,
-          totalCreditedAmount: row.totalCreditedAmount
+          totalCreditedAmount: row.totalCreditedAmount,
+          totalPlatformCommission: row.totalPlatformCommission,
+          totalPayoutCommission: row.totalPayoutCommission
         });
-        continue;
+        return;
       }
 
       monthMap.set(monthKey, {
@@ -155,34 +191,73 @@ export class WorksService implements OnModuleInit {
         paidWorksCount: row.paidWorksCount,
         totalAmount: row.totalAmount,
         totalCreditedAmount: row.totalCreditedAmount,
+        totalPlatformCommission: row.totalPlatformCommission,
+        totalPayoutCommission: row.totalPayoutCommission,
         clients: [
           {
             clientId: row.clientId,
             clientName: row.clientName,
+            source: row.source,
             worksCount: row.worksCount,
             paidWorksCount: row.paidWorksCount,
             totalAmount: row.totalAmount,
-            totalCreditedAmount: row.totalCreditedAmount
+            totalCreditedAmount: row.totalCreditedAmount,
+            totalPlatformCommission: row.totalPlatformCommission,
+            totalPayoutCommission: row.totalPayoutCommission
           }
         ]
       });
-    }
+    };
+
+    rows.forEach((row) =>
+      pushRow({
+        year: row.year,
+        month: row.month,
+        clientId: row.clientId,
+        clientName: row.clientName,
+        source: 'document',
+        worksCount: row.worksCount,
+        paidWorksCount: row.paidWorksCount,
+        totalAmount: row.totalAmount,
+        totalCreditedAmount: row.totalCreditedAmount,
+        totalPlatformCommission: 0,
+        totalPayoutCommission: 0
+      })
+    );
+
+    incomeRows.forEach((row) =>
+      pushRow({
+        year: row.year,
+        month: row.month,
+        clientId: row.clientId,
+        clientName: row.clientName,
+        source: row.source,
+        worksCount: row.entriesCount,
+        paidWorksCount: row.paidEntriesCount,
+        totalAmount: row.grossAmount,
+        totalCreditedAmount: row.netAmount,
+        totalPlatformCommission: row.platformCommission,
+        totalPayoutCommission: row.payoutCommission
+      })
+    );
 
     return {
       paidOnly,
       summary,
-      months: Array.from(monthMap.values()).map((month) => ({
-        ...month,
-        clients: month.clients.sort((left, right) => {
-          if (left.totalAmount !== right.totalAmount) {
-            return right.totalAmount - left.totalAmount;
-          }
-          if (left.worksCount !== right.worksCount) {
-            return right.worksCount - left.worksCount;
-          }
-          return left.clientName.localeCompare(right.clientName, 'ru-RU');
-        })
-      }))
+      months: Array.from(monthMap.values())
+        .sort((left, right) => right.monthKey.localeCompare(left.monthKey))
+        .map((month) => ({
+          ...month,
+          clients: month.clients.sort((left, right) => {
+            if (left.totalAmount !== right.totalAmount) {
+              return right.totalAmount - left.totalAmount;
+            }
+            if (left.worksCount !== right.worksCount) {
+              return right.worksCount - left.worksCount;
+            }
+            return left.clientName.localeCompare(right.clientName, 'ru-RU');
+          })
+        }))
     };
   }
 
@@ -340,6 +415,13 @@ export class WorksService implements OnModuleInit {
     const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
 
     return this.buildInvoicePdf(work, organization, client);
+  }
+
+  async generateUpdPdf(id: string) {
+    const work = await this.findById(id);
+    const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
+
+    return this.workUpdPdfService.build(work, organization, client);
   }
 
   private buildActPdf(work: any, organization: any, client: any): Promise<Buffer> {

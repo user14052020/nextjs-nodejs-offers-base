@@ -14,6 +14,17 @@ type BackupStream = {
   stream: Readable;
 };
 
+const BACKUP_DATE_FIELDS_BY_COLLECTION: Record<string, string[]> = {
+  clients: ['createdAt', 'updatedAt'],
+  files: ['createdAt', 'updatedAt'],
+  incomes: ['incomeDate', 'receiptDate', 'createdAt', 'updatedAt'],
+  organizations: ['createdAt', 'updatedAt'],
+  sequences: ['createdAt', 'updatedAt'],
+  users: ['createdAt', 'updatedAt'],
+  works: ['actDate', 'invoiceDate', 'createdAt', 'updatedAt'],
+  'uploads.files': ['uploadDate']
+};
+
 @Injectable()
 export class BackupService {
   constructor(
@@ -92,6 +103,7 @@ export class BackupService {
     for (const [name, documents] of backupCollections) {
       const restored = (documents as unknown[])
         .map((document) => this.reviveExtendedJson(document))
+        .map((document) => this.normalizeDocumentDates(name, document))
         .map((document) => this.normalizeDocumentIds(name, document))
         .filter((document): document is Record<string, unknown> => {
           return Boolean(document && typeof document === 'object' && !Array.isArray(document));
@@ -185,37 +197,50 @@ export class BackupService {
   }
 
   private stringifyDocument(value: unknown) {
-    return JSON.stringify(value, (_key, currentValue) => {
-      if (currentValue instanceof Date) {
-        return { $date: currentValue.toISOString() };
+    return JSON.stringify(this.serializeExtendedJson(value));
+  }
+
+  private serializeExtendedJson(value: unknown): unknown {
+    if (value instanceof Date) {
+      return { $date: value.toISOString() };
+    }
+
+    if (Buffer.isBuffer(value)) {
+      return { $binary: value.toString('base64') };
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.serializeExtendedJson(item));
+    }
+
+    if (value && typeof value === 'object') {
+      const candidate = value as {
+        _bsontype?: string;
+        toHexString?: () => string;
+        buffer?: Uint8Array;
+        sub_type?: number;
+      };
+
+      if (candidate._bsontype === 'ObjectId' && typeof candidate.toHexString === 'function') {
+        return { $oid: candidate.toHexString() };
       }
 
-      if (Buffer.isBuffer(currentValue)) {
-        return { $binary: currentValue.toString('base64') };
-      }
-
-      if (currentValue && typeof currentValue === 'object') {
-        const candidate = currentValue as {
-          _bsontype?: string;
-          toHexString?: () => string;
-          buffer?: Uint8Array;
-          sub_type?: number;
+      if (candidate._bsontype === 'Binary' && candidate.buffer instanceof Uint8Array) {
+        return {
+          $binary: Buffer.from(candidate.buffer).toString('base64'),
+          $type: String(candidate.sub_type ?? 0)
         };
-
-        if (candidate._bsontype === 'ObjectId' && typeof candidate.toHexString === 'function') {
-          return { $oid: candidate.toHexString() };
-        }
-
-        if (candidate._bsontype === 'Binary' && candidate.buffer instanceof Uint8Array) {
-          return {
-            $binary: Buffer.from(candidate.buffer).toString('base64'),
-            $type: String(candidate.sub_type ?? 0)
-          };
-        }
       }
 
-      return currentValue;
-    });
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, currentValue]) => [
+          key,
+          this.serializeExtendedJson(currentValue)
+        ])
+      );
+    }
+
+    return value;
   }
 
   private reviveExtendedJson(value: unknown): unknown {
@@ -257,6 +282,52 @@ export class BackupService {
     return revived;
   }
 
+  private normalizeDocumentDates(collectionName: string, document: unknown): unknown {
+    if (!document || typeof document !== 'object' || Array.isArray(document)) {
+      return document;
+    }
+
+    const dateFields = BACKUP_DATE_FIELDS_BY_COLLECTION[collectionName] ?? [];
+    if (!dateFields.length) {
+      return document;
+    }
+
+    const normalized = { ...(document as Record<string, unknown>) };
+    for (const field of dateFields) {
+      if (field in normalized) {
+        normalized[field] = this.toDateMaybe(normalized[field]);
+      }
+    }
+
+    return normalized;
+  }
+
+  private toDateMaybe(value: unknown): unknown {
+    if (value instanceof Date) {
+      return value;
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const object = value as Record<string, unknown>;
+      if (Object.keys(object).length === 1 && object.$date) {
+        const parsed = new Date(String(object.$date));
+        return Number.isNaN(parsed.getTime()) ? value : parsed;
+      }
+    }
+
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return value;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? value : parsed;
+  }
+
   private normalizeDocumentIds(collectionName: string, document: unknown): unknown {
     if (!document || typeof document !== 'object' || Array.isArray(document)) {
       return document;
@@ -286,6 +357,7 @@ export class BackupService {
     switch (collectionName) {
       case 'organizations':
       case 'clients':
+      case 'incomes':
       case 'works':
       case 'files':
       case 'users':
@@ -301,6 +373,44 @@ export class BackupService {
       normalizeIdField('executorOrganizationId');
       normalizeIdField('clientId');
       normalized.isPayed = typeof normalized.isPayed === 'boolean' ? normalized.isPayed : false;
+    }
+
+    if (collectionName === 'incomes') {
+      normalized.source = normalized.source === 'kwork' || normalized.source === 'manual' ? normalized.source : 'manual';
+      normalized.sourceName = typeof normalized.sourceName === 'string' ? normalized.sourceName : 'Ручной доход';
+      normalized.platformCommission =
+        typeof normalized.platformCommission === 'number' && Number.isFinite(normalized.platformCommission)
+          ? normalized.platformCommission
+          : 0;
+      normalized.payoutCommission =
+        typeof normalized.payoutCommission === 'number' && Number.isFinite(normalized.payoutCommission)
+          ? normalized.payoutCommission
+          : 0;
+      normalized.currency = typeof normalized.currency === 'string' ? normalized.currency : 'RUB';
+      normalized.isReceived = typeof normalized.isReceived === 'boolean' ? normalized.isReceived : true;
+      normalized.paymentMethod =
+        ['platform', 'bank_account', 'card_transfer', 'cash', 'other'].includes(String(normalized.paymentMethod))
+          ? normalized.paymentMethod
+          : normalized.source === 'kwork'
+            ? 'platform'
+            : 'card_transfer';
+      normalized.confirmationDocumentType =
+        ['platform_report', 'receipt', 'none'].includes(String(normalized.confirmationDocumentType))
+          ? normalized.confirmationDocumentType
+          : normalized.source === 'kwork'
+            ? 'platform_report'
+            : 'receipt';
+      normalized.taxRegime = typeof normalized.taxRegime === 'string' ? normalized.taxRegime : 'ПСН';
+      normalized.cashRegisterExemptionReason =
+        typeof normalized.cashRegisterExemptionReason === 'string'
+          ? normalized.cashRegisterExemptionReason
+          : 'ККТ не применяется: ПСН, п. 2.1 ст. 2 54-ФЗ';
+      if (normalized.receiptNumber && !normalized.receiptDate) {
+        normalized.receiptDate = normalized.incomeDate;
+      }
+      if (normalized.receiptDate instanceof Date) {
+        normalized.receiptYear = normalized.receiptDate.getFullYear();
+      }
     }
 
     if (collectionName === 'files') {
