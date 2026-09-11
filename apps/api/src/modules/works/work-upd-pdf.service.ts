@@ -24,6 +24,7 @@ type PartyLike = {
   contract?: string;
   signerName?: string;
   chiefAccountant?: string;
+  isPhysicalPerson?: boolean;
 };
 
 type WorkLike = {
@@ -395,7 +396,7 @@ export class WorkUpdPdfService {
     const buyer = this.partyName(client);
     const signer = this.clean(organization.signerName) || seller;
     const accountant = this.clean(organization.chiefAccountant) || signer;
-    const buyerSigner = this.clean(client.signerName);
+    const buyerSigner = this.personShortName(client.signerName) || (client.isPhysicalPerson ? this.personShortName(client.name) : '');
     const transferDate = this.formatDate(work.actDate || work.invoiceDate);
     const basis = this.clean(client.contract) || 'Без документа-основания';
 
@@ -489,7 +490,7 @@ export class WorkUpdPdfService {
       y,
       width,
       'Наименование оператора электронного документооборота',
-      'Печатная форма сформирована в offers-base',
+      '',
       '(21)'
     );
   }
@@ -703,6 +704,34 @@ export class WorkUpdPdfService {
       return `${inn} / ${kpp}`;
     }
     return inn || kpp || '-';
+  }
+
+  private personShortName(value?: string) {
+    const cleaned = this.clean(value)
+      .replace(/\s+/g, ' ')
+      .replace(/^ИП\s+/iu, '');
+    if (!cleaned) {
+      return '';
+    }
+
+    const compactInitialsMatch = /^([А-ЯЁA-Z][а-яёa-z-]+)\s+([А-ЯЁA-Z])\.\s*([А-ЯЁA-Z])\.?$/u.exec(cleaned);
+    if (compactInitialsMatch) {
+      return `${compactInitialsMatch[1]} ${compactInitialsMatch[2]}.${compactInitialsMatch[3]}.`;
+    }
+
+    const parts = cleaned.split(' ').filter(Boolean);
+    if (parts.length < 2 || !/^[А-ЯЁA-Z][а-яёa-z-]+$/u.test(parts[0])) {
+      return cleaned;
+    }
+
+    const initials = parts
+      .slice(1, 3)
+      .map((part) => part.charAt(0).toUpperCase())
+      .filter(Boolean)
+      .map((letter) => `${letter}.`)
+      .join('');
+
+    return initials ? `${parts[0]} ${initials}` : cleaned;
   }
 
   private formatDate(value?: Date | string) {
