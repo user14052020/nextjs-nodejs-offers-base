@@ -48,28 +48,33 @@ export class WorksController {
 
   @Get(':id/act.pdf')
   async actPdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.worksService.generateActPdf(id);
-    this.sendPdf(res, buffer, `act-${id}.pdf`);
+    const document = await this.worksService.generateActPdf(id);
+    this.sendPdf(res, document.buffer, document.filename);
   }
 
   @Get(':id/invoice.pdf')
   async invoicePdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.worksService.generateInvoicePdf(id);
-    this.sendPdf(res, buffer, `invoice-${id}.pdf`);
+    const document = await this.worksService.generateInvoicePdf(id);
+    this.sendPdf(res, document.buffer, document.filename);
   }
 
   @Get(':id/upd.pdf')
   async updPdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.worksService.generateUpdPdf(id);
-    this.sendPdf(res, buffer, `upd-${id}.pdf`);
+    const document = await this.worksService.generateUpdPdf(id);
+    this.sendPdf(res, document.buffer, document.filename);
   }
 
   private sendPdf(res: Response, buffer: Buffer, filename: string) {
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Disposition', this.contentDisposition(filename));
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.send(buffer);
+  }
+
+  private contentDisposition(filename: string) {
+    const fallback = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+    return `inline; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
   }
 }

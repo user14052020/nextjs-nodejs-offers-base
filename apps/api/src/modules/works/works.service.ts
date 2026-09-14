@@ -406,22 +406,50 @@ export class WorksService implements OnModuleInit {
   async generateActPdf(id: string) {
     const work = await this.findById(id);
     const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
+    const buffer = await this.buildActPdf(work, organization, client);
 
-    return this.buildActPdf(work, organization, client);
+    return {
+      buffer,
+      filename: this.buildDocumentPdfFilename('АКТ', work.actNumber, work.actDate)
+    };
   }
 
   async generateInvoicePdf(id: string) {
     const work = await this.findById(id);
     const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
+    const buffer = await this.buildInvoicePdf(work, organization, client);
 
-    return this.buildInvoicePdf(work, organization, client);
+    return {
+      buffer,
+      filename: this.buildDocumentPdfFilename('СЧЕТ', work.invoiceNumber, work.invoiceDate)
+    };
   }
 
   async generateUpdPdf(id: string) {
     const work = await this.findById(id);
     const { organization, client } = await this.resolveWorkPartiesForDocuments(work);
+    const buffer = await this.workUpdPdfService.build(work, organization, client);
 
-    return this.workUpdPdfService.build(work, organization, client);
+    return {
+      buffer,
+      filename: this.buildDocumentPdfFilename('УПД', work.invoiceNumber, work.invoiceDate)
+    };
+  }
+
+  private buildDocumentPdfFilename(documentType: 'АКТ' | 'СЧЕТ' | 'УПД', number: string, date: Date | string) {
+    const normalizedNumber = this.sanitizeFilenamePart(number || 'без номера');
+    const normalizedDate = this.sanitizeFilenamePart(this.formatDate(date));
+
+    return `${documentType}№${normalizedNumber}ОТ${normalizedDate}.pdf`;
+  }
+
+  private sanitizeFilenamePart(value: string) {
+    return value
+      .trim()
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
+      .replace(/\s+/g, ' ')
+      .replace(/-+/g, '-')
+      .replace(/^[.\-\s]+|[.\-\s]+$/g, '') || 'без значения';
   }
 
   private buildActPdf(work: any, organization: any, client: any): Promise<Buffer> {

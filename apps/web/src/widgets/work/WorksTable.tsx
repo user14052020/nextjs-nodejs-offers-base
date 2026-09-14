@@ -7,7 +7,7 @@ import { Client } from '@/entities/client/types';
 import { Organization } from '@/entities/organization/types';
 import { actPdfUrl, deleteWork, invoicePdfUrl, updPdfUrl, updateWork } from '@/entities/work/api';
 import { Work } from '@/entities/work/types';
-import { fetchBlob } from '@/shared/api/http';
+import { fetchBlobFile } from '@/shared/api/http';
 
 export const WorksTable: React.FC<{
   items: Work[];
@@ -95,9 +95,16 @@ export const WorksTable: React.FC<{
   const openPdf = async (url: string) => {
     try {
       setError(null);
-      const blob = await fetchBlob(url);
-      const objectUrl = URL.createObjectURL(blob);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      const { blob, filename } = await fetchBlobFile(url);
+      const pdfFile = filename ? new File([blob], filename, { type: blob.type || 'application/pdf' }) : blob;
+      const objectUrl = URL.createObjectURL(pdfFile);
+      const opened = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      if (!opened && filename) {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        link.click();
+      }
       setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка печати PDF');

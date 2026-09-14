@@ -50,6 +50,24 @@ export async function fetchBlob(url: string): Promise<Blob> {
   return response.blob();
 }
 
+export async function fetchBlobFile(url: string): Promise<{ blob: Blob; filename: string | null }> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(url, { headers, cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error('Не удалось скачать файл');
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: parseFilenameFromContentDisposition(response.headers.get('content-disposition'))
+  };
+}
+
 const parseFilenameFromContentDisposition = (contentDisposition: string | null) => {
   if (!contentDisposition) {
     return null;
