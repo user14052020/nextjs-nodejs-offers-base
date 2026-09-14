@@ -126,7 +126,7 @@ export class WorkUpdPdfService {
     const buyerName = this.partyName(client);
 
     this.drawVerticalRule(doc, sideX, 55.5, 234.75, 0.75);
-    this.drawVerticalRule(doc, 85.8, 55.5, 234.75, 1.5);
+    this.drawVerticalRule(doc, sideRight, 55.5, 234.75, 1.5);
 
     this.drawTextBox(doc, fonts, 'Универсальный\nпередаточный\nдокумент', 21, 56, 61, 30, {
       size: 6.1,
@@ -208,8 +208,10 @@ export class WorkUpdPdfService {
       this.drawHorizontalRule(doc, columns[13], columns[15], middleY, 0.75);
       this.drawHorizontalRule(doc, columns[16], columns[18], middleY, 0.75);
 
+      const mergedHeaderDividerIndexes = new Set([5, 14, 17]);
       columns.forEach((x, index) => {
-        this.drawVerticalRule(doc, x, currentY, codesY, index === 1 ? 1.5 : 0.75);
+        const fromY = mergedHeaderDividerIndexes.has(index) ? middleY : currentY;
+        this.drawVerticalRule(doc, x, fromY, codesY, index === 1 ? 1.5 : 0.75);
       });
 
       const headerCells = [
