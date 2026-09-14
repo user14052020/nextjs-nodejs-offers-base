@@ -551,7 +551,7 @@ export class WorkUpdPdfService {
     this.drawTextBox(doc, fonts, 'Иные сведения\nо получении, приемке', 429, 190, 79, 17, { size: 5.8, bold: true });
     this.drawHorizontalRule(doc, 103.5, 320.2, 190.5);
     this.drawHorizontalRule(doc, 552, 785, 190.5);
-    this.drawTextBox(doc, fonts, 'Услуги оказаны в полном объеме', 104, 177.7, 216, 11, { size: 5.6, align: 'center' });
+    this.drawTextBox(doc, fonts, 'Услуги оказаны в полном объеме', 104, 182.5, 216, 7, { size: 5.4, align: 'center' });
     this.drawTextBox(doc, fonts, '(14)', 333, 188, 22, 8, { size: 5.4, align: 'right' });
     this.drawTextBox(doc, fonts, '(19)', 800, 188, 23, 8, { size: 5.4, align: 'right' });
 
