@@ -1,40 +1,6 @@
 import { getToken } from '@/shared/lib/auth';
 
-const API_PREFIX = '/api/v1';
-const API_PORT = '3201';
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
-
-const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
-
-const resolveApiOrigin = () => {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (configured) {
-    const normalized = trimTrailingSlash(configured);
-    if (typeof window === 'undefined') {
-      return normalized;
-    }
-
-    try {
-      const url = new URL(normalized);
-      if (LOCAL_HOSTS.has(url.hostname) && !LOCAL_HOSTS.has(window.location.hostname)) {
-        url.hostname = window.location.hostname;
-        return trimTrailingSlash(url.origin);
-      }
-    } catch {
-      return '';
-    }
-
-    return normalized;
-  }
-
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:${API_PORT}`;
-  }
-
-  return '';
-};
-
-export const getApiPath = (path: string) => `${resolveApiOrigin()}${API_PREFIX}${path}`;
+export const getApiPath = (path: string) => `/api/v1${path}`;
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
