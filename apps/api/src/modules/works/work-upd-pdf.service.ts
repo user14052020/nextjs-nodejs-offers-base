@@ -101,7 +101,7 @@ export class WorkUpdPdfService {
     doc.fontSize(5.4).text(
       'Приложение № 1 к постановлению Правительства Российской Федерации\nот 26 декабря 2011 года № 1137\n(в ред. Постановления Правительства РФ от 23.01.2026 № 26)',
       578,
-      56,
+      42,
       { width: 245, align: 'right', lineGap: 0.6 }
     );
   }
@@ -128,20 +128,20 @@ export class WorkUpdPdfService {
     this.drawVerticalRule(doc, sideX, 55.5, 234.75, 0.75);
     this.drawVerticalRule(doc, 85.8, 55.5, 234.75, 1.5);
 
-    this.drawTextBox(doc, fonts, 'Универсальный\nпередаточный\nдокумент', 18, 56, 64, 30, {
+    this.drawTextBox(doc, fonts, 'Универсальный\nпередаточный\nдокумент', 21, 56, 61, 30, {
       size: 6.1,
       align: 'left'
     });
-    this.drawTextBox(doc, fonts, 'Статус', 18, 94, 27, 8, { size: 6.2 });
+    this.drawTextBox(doc, fonts, 'Статус', 21, 94, 25, 8, { size: 6.2 });
     this.drawBox(doc, 46.5, 90, 19.5, 15);
     this.drawTextBox(doc, fonts, '2', 47, 90.6, 18.5, 13, { size: 8.2, bold: true, align: 'center' });
     this.drawTextBox(
       doc,
       fonts,
       '1 - счет-фактура\nи передаточный\nдокумент (акт)\n2 - передаточный\nдокумент (акт)\n3 - счет-фактура',
-      18,
+      21,
       114,
-      66,
+      62,
       54,
       { size: 5.2, align: 'left' }
     );
@@ -217,7 +217,6 @@ export class WorkUpdPdfService {
         [1, 2, '№\nп/п'],
         [2, 3, 'Наименование товара\n(описание выполненных\nработ, оказанных услуг),\nимущественного права'],
         [3, 4, 'Код\nвида\nтовара'],
-        [4, 6, 'Единица\nизмерения'],
         [6, 7, 'Количе-\nство\n(объем)'],
         [7, 8, 'Цена\n(тариф)\nза единицу\nизмерения'],
         [8, 9, 'Стоимость товаров\n(работ, услуг),\nимущественных прав\nбез налога - всего'],
@@ -225,9 +224,7 @@ export class WorkUpdPdfService {
         [10, 11, 'Налоговая\nставка'],
         [11, 12, 'Сумма налога,\nпредъявляемая\nпокупателю'],
         [12, 13, 'Стоимость товаров\n(работ, услуг),\nимущественных прав\nс налогом - всего'],
-        [13, 15, 'Страна происхождения\nтовара'],
         [15, 16, 'Регистрационный\nномер декларации\nна товары или\nрегистрационный\nномер партии\nтовара,\nподлежащего\nпрослеживаемости'],
-        [16, 18, 'Единица\nизмерения товара,\nиспользуемая\nв целях\nосуществления\nпрослеживаемости'],
         [18, 19, 'Количество товара,\nподлежащего\nпрослеживаемости'],
         [19, 20, 'Стоимость товара,\nподлежащего\nпрослеживаемости,\nбез НДС']
       ] as Array<[number, number, string]>;
@@ -235,6 +232,21 @@ export class WorkUpdPdfService {
       headerCells.forEach(([from, to, title]) => {
         this.drawTextBox(doc, fonts, title, columns[from] + 1.5, currentY + 3, columns[to] - columns[from] - 3, bottomY - currentY - 6, {
           size: from === 15 ? 4.25 : 4.8,
+          bold: true,
+          align: 'center',
+          valign: 'middle'
+        });
+      });
+
+      const groupHeaderCells = [
+        [4, 6, 'Единица\nизмерения'],
+        [13, 15, 'Страна происхождения\nтовара'],
+        [16, 18, 'Единица\nизмерения товара,\nиспользуемая\nв целях\nосуществления\nпрослеживаемости']
+      ] as Array<[number, number, string]>;
+
+      groupHeaderCells.forEach(([from, to, title]) => {
+        this.drawTextBox(doc, fonts, title, columns[from] + 1.5, currentY + 3, columns[to] - columns[from] - 3, middleY - currentY - 6, {
+          size: from === 16 ? 4.35 : 4.8,
           bold: true,
           align: 'center',
           valign: 'middle'
@@ -497,7 +509,7 @@ export class WorkUpdPdfService {
       bold: true
     });
     this.drawHorizontalRule(doc, 168.8, 785, 111.8);
-    this.drawTextBox(doc, fonts, 'Услуги оказаны, груз и транспортировка отсутствуют', 170, 99, 613, 11, {
+    this.drawTextBox(doc, fonts, 'Услуги оказаны, груз и транспортировка отсутствуют', 170, 103.5, 613, 7, {
       size: 5.6,
       align: 'center'
     });
