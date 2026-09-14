@@ -10,6 +10,7 @@ import { Organization } from '@/entities/organization/types';
 import { CreateItemSection } from '@/features/create-item/CreateItemSection';
 import { fetchWorks } from '@/entities/work/api';
 import { Work } from '@/entities/work/types';
+import { KworkBalanceImportForm } from '@/features/work/KworkBalanceImportForm';
 import { WorkForm } from '@/features/work/WorkForm';
 import { WorksTable } from '@/widgets/work/WorksTable';
 
@@ -87,6 +88,7 @@ export default function WorksPage() {
           onCancelEdit={() => setEditingItem(null)}
         />
       </CreateItemSection>
+      <KworkBalanceImportForm onImported={() => load(activeQuery)} />
       {error && <Alert color="red">{error}</Alert>}
       <WorksTable
         items={works}

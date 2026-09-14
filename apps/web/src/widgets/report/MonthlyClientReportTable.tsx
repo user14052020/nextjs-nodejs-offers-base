@@ -24,7 +24,7 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
   const sourceLabel = (source: string) => {
     if (source === 'document') return 'Счет/акт';
     if (source === 'kwork') return 'Kwork';
-    return 'Доход';
+    return 'Работа';
   };
 
   if (months.length === 0) {
@@ -41,8 +41,8 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
         <div>
           <Title order={3}>Книга доходов по месяцам</Title>
           <Text size="sm" c="dimmed">
-            {paidOnly ? 'Учитываются только полученные доходы.' : 'Учитываются все записи.'} Счета/акты и доходы
-            площадок сведены в один отчет, но остаются разными источниками.
+            {paidOnly ? 'Учитываются только оплаченные работы.' : 'Учитываются все работы.'} Прямые документы и Kwork
+            остаются разными источниками.
           </Text>
         </div>
 
@@ -94,7 +94,7 @@ export const MonthlyClientReportTable: React.FC<{ months: MonthlyClientReportMon
                           const commission = client.totalPlatformCommission + client.totalPayoutCommission;
 
                           return (
-                            <Table.Tr key={`${month.monthKey}-${client.clientId}`}>
+                            <Table.Tr key={`${month.monthKey}-${client.source}-${client.clientId}`}>
                               <Table.Td>
                                 <Badge variant="light" color={client.source === 'document' ? 'gray' : 'dark'}>
                                   {sourceLabel(client.source)}

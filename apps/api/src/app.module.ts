@@ -10,7 +10,6 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { FilesModule } from './modules/files/files.module';
-import { IncomesModule } from './modules/incomes/incomes.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { SequencesModule } from './modules/sequences/sequences.module';
 import { UsersModule } from './modules/users/users.module';
@@ -30,7 +29,6 @@ import { WorksModule } from './modules/works/works.module';
     OrganizationsModule,
     ClientsModule,
     FilesModule,
-    IncomesModule,
     SequencesModule,
     WorksModule
   ]

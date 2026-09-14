@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export type WorkDocument = Work & Document;
+export type WorkSource = 'document' | 'kwork';
 
 @Schema({ _id: false })
 export class WorkItem {
@@ -36,6 +37,18 @@ export class Work {
 
   @Prop({ default: 'RUB' })
   currency?: string;
+
+  @Prop({ required: true, enum: ['document', 'kwork'], default: 'document' })
+  source: WorkSource;
+
+  @Prop({ trim: true })
+  sourceName?: string;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  platformCommission: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  payoutCommission: number;
 
   @Prop({ type: Types.ObjectId, ref: 'Organization', required: true })
   executorOrganizationId: Types.ObjectId;

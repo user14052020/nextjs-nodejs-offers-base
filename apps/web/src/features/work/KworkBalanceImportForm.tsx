@@ -3,10 +3,10 @@
 import React from 'react';
 import { Alert, Button, FileInput, Group, List, Paper, Stack, Text, Title } from '@mantine/core';
 
-import { importIncomeBalanceReport } from '@/entities/income/api';
-import { BalanceReportImportResult } from '@/entities/income/types';
+import { importKworkBalanceReport } from '@/entities/work/api';
+import { BalanceReportImportResult } from '@/entities/work/types';
 
-export const IncomeBalanceImportForm: React.FC<{ onImported?: () => void | Promise<void> }> = ({ onImported }) => {
+export const KworkBalanceImportForm: React.FC<{ onImported?: () => void | Promise<void> }> = ({ onImported }) => {
   const [file, setFile] = React.useState<File | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<BalanceReportImportResult | null>(null);
@@ -23,12 +23,12 @@ export const IncomeBalanceImportForm: React.FC<{ onImported?: () => void | Promi
     setResult(null);
 
     try {
-      const importResult = await importIncomeBalanceReport(file);
+      const importResult = await importKworkBalanceReport(file);
       setResult(importResult);
       setFile(null);
       await onImported?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось импортировать доходы');
+      setError(err instanceof Error ? err.message : 'Не удалось импортировать работы Kwork');
     } finally {
       setLoading(false);
     }
@@ -38,10 +38,10 @@ export const IncomeBalanceImportForm: React.FC<{ onImported?: () => void | Promi
     <Paper withBorder shadow="sm" radius="lg" p="xl">
       <Stack gap="md" maw={720}>
         <div>
-          <Title order={2}>Импорт доходов Kwork</Title>
+          <Title order={2}>Импорт работ Kwork</Title>
           <Text c="dimmed" size="sm">
-            XLSX отчет баланса импортируется в отдельный учет доходов. Сумма заказа попадает в валовый доход,
-            зачисление после комиссии сохраняется отдельно.
+            XLSX отчет баланса создает оплаченные работы. Сумма чека становится суммой документа, а сумма зачисления
+            сохраняется отдельно.
           </Text>
         </div>
 
@@ -78,7 +78,7 @@ export const IncomeBalanceImportForm: React.FC<{ onImported?: () => void | Promi
 
         <Group>
           <Button variant="light" color="gray" loading={loading} disabled={!file} onClick={handleSubmit}>
-            Импортировать доходы
+            Импортировать работы
           </Button>
         </Group>
       </Stack>

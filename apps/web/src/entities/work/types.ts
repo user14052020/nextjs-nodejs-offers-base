@@ -12,6 +12,10 @@ export type Work = {
   creditedAmount?: number;
   isPayed?: boolean;
   currency?: string;
+  source?: 'document' | 'kwork';
+  sourceName?: string;
+  platformCommission?: number;
+  payoutCommission?: number;
   executorOrganizationId: string;
   clientId: string;
   actNumber: string;
@@ -20,4 +24,19 @@ export type Work = {
   invoiceDate: string;
   actYear?: number;
   invoiceYear?: number;
+};
+
+export type BalanceReportImportWarning = {
+  sheetName: string;
+  rowNumber: number;
+  message: string;
+};
+
+export type BalanceReportImportResult = {
+  totalRows: number;
+  parsedRows: number;
+  importedRows: number;
+  skippedDuplicates: number;
+  skippedRows: number;
+  warnings: BalanceReportImportWarning[];
 };

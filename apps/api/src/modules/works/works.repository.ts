@@ -9,10 +9,13 @@ export type MonthlyClientReportAggregateRow = {
   month: number;
   clientId: string;
   clientName: string;
+  source: 'document' | 'kwork';
   worksCount: number;
   paidWorksCount: number;
   totalAmount: number;
   totalCreditedAmount: number;
+  totalPlatformCommission: number;
+  totalPayoutCommission: number;
 };
 
 export type WorkListRow = Work & {
@@ -131,6 +134,34 @@ export class WorksRepository {
     );
   }
 
+  async backfillReportingDefaults() {
+    await this.workModel.updateMany(
+      {
+        $or: [
+          { source: { $exists: false } },
+          { source: { $nin: ['document', 'kwork'] } },
+          { platformCommission: { $exists: false } },
+          { payoutCommission: { $exists: false } }
+        ]
+      },
+      [
+        {
+          $set: {
+            source: {
+              $cond: [{ $in: ['$source', ['document', 'kwork']] }, '$source', 'document']
+            },
+            platformCommission: {
+              $convert: { input: '$platformCommission', to: 'double', onError: 0, onNull: 0 }
+            },
+            payoutCommission: {
+              $convert: { input: '$payoutCommission', to: 'double', onError: 0, onNull: 0 }
+            }
+          }
+        }
+      ]
+    );
+  }
+
   async ensureYearlyNumberIndexes() {
     const indexes = await this.workModel.collection.indexes();
     const legacyAct = indexes.find((index) => index.name === 'actNumber_1' && index.unique);
@@ -162,6 +193,11 @@ export class WorksRepository {
     await this.workModel.collection.createIndex(
       { actDate: -1, clientId: 1 },
       { name: 'actDate_-1_clientId_1' }
+    );
+
+    await this.workModel.collection.createIndex(
+      { source: 1, actDate: -1 },
+      { name: 'source_1_actDate_-1' }
     );
   }
 
@@ -214,9 +250,18 @@ export class WorksRepository {
   }
 
   async findDuplicateImportCandidates(payload: { documentDate: Date; itemName: string }) {
+    const dayStart = new Date(
+      Date.UTC(payload.documentDate.getUTCFullYear(), payload.documentDate.getUTCMonth(), payload.documentDate.getUTCDate())
+    );
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
     return this.workModel
       .find({
-        $or: [{ actDate: payload.documentDate }, { invoiceDate: payload.documentDate }],
+        $or: [
+          { actDate: { $gte: dayStart, $lt: dayEnd } },
+          { invoiceDate: { $gte: dayStart, $lt: dayEnd } }
+        ],
         'items.name': payload.itemName
       })
       .exec();
@@ -327,6 +372,9 @@ export class WorksRepository {
           year: { $year: '$reportDate' },
           month: { $month: '$reportDate' },
           clientId: '$clientId',
+          source: {
+            $cond: [{ $eq: ['$source', 'kwork'] }, 'kwork', 'document']
+          },
           itemsCount: {
             $cond: [{ $isArray: '$items' }, { $size: '$items' }, 0]
           },
@@ -345,6 +393,12 @@ export class WorksRepository {
               onError: 0,
               onNull: 0
             }
+          },
+          platformCommission: {
+            $convert: { input: '$platformCommission', to: 'double', onError: 0, onNull: 0 }
+          },
+          payoutCommission: {
+            $convert: { input: '$payoutCommission', to: 'double', onError: 0, onNull: 0 }
           }
         }
       },
@@ -353,12 +407,15 @@ export class WorksRepository {
           _id: {
             year: '$year',
             month: '$month',
-            clientId: '$clientId'
+            clientId: '$clientId',
+            source: '$source'
           },
           worksCount: { $sum: '$itemsCount' },
           paidWorksCount: { $sum: '$paidWorksCount' },
           totalAmount: { $sum: '$amount' },
-          totalCreditedAmount: { $sum: '$creditedAmount' }
+          totalCreditedAmount: { $sum: '$creditedAmount' },
+          totalPlatformCommission: { $sum: '$platformCommission' },
+          totalPayoutCommission: { $sum: '$payoutCommission' }
         }
       },
       {
@@ -379,10 +436,13 @@ export class WorksRepository {
             $ifNull: [{ $toString: '$_id.clientId' }, '__unknown_client__']
           },
           clientName: { $ifNull: ['$client.name', 'Клиент не найден'] },
+          source: '$_id.source',
           worksCount: 1,
           paidWorksCount: 1,
           totalAmount: 1,
-          totalCreditedAmount: 1
+          totalCreditedAmount: 1,
+          totalPlatformCommission: 1,
+          totalPayoutCommission: 1
         }
       },
       { $sort: { year: -1, month: -1, totalAmount: -1, worksCount: -1, clientName: 1 } }

@@ -11,7 +11,6 @@ import {
 } from '../../common/errors/service.exception';
 import { UnitOfWork } from '../../common/uow/unit-of-work';
 import { ClientsService } from '../clients/clients.service';
-import { IncomesService } from '../incomes/incomes.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
@@ -39,7 +38,7 @@ type PdfTableMeasurementCell = {
 type MonthlyClientReportRow = {
   clientId: string;
   clientName: string;
-  source: 'document' | 'kwork' | 'manual';
+  source: 'document' | 'kwork';
   worksCount: number;
   paidWorksCount: number;
   totalAmount: number;
@@ -88,7 +87,6 @@ export class WorksService implements OnModuleInit {
     private readonly worksRepository: WorksRepository,
     private readonly organizationsService: OrganizationsService,
     private readonly clientsService: ClientsService,
-    private readonly incomesService: IncomesService,
     private readonly workUpdPdfService: WorkUpdPdfService,
     private readonly searchService: SearchService,
     private readonly uow: UnitOfWork
@@ -98,6 +96,7 @@ export class WorksService implements OnModuleInit {
     await this.worksRepository.backfillDocumentDates();
     await this.worksRepository.backfillYears();
     await this.worksRepository.backfillPaymentStatus();
+    await this.worksRepository.backfillReportingDefaults();
     await this.worksRepository.ensureYearlyNumberIndexes();
     await this.worksRepository.ensureReportingIndexes();
     const rows = await this.worksRepository.findAll();
@@ -127,10 +126,7 @@ export class WorksService implements OnModuleInit {
   }
 
   async getMonthlyClientReport(paidOnly = true): Promise<MonthlyClientReport> {
-    const [rows, incomeRows] = await Promise.all([
-      this.worksRepository.aggregateMonthlyClientReport({ paidOnly }),
-      this.incomesService.aggregateMonthlyReport({ receivedOnly: paidOnly })
-    ]);
+    const rows = await this.worksRepository.aggregateMonthlyClientReport({ paidOnly });
     const monthMap = new Map<string, MonthlyClientReportMonth>();
     const summary: MonthlyClientReportSummary = {
       totalWorks: 0,
@@ -146,7 +142,7 @@ export class WorksService implements OnModuleInit {
       month: number;
       clientId: string;
       clientName: string;
-      source: 'document' | 'kwork' | 'manual';
+      source: 'document' | 'kwork';
       worksCount: number;
       paidWorksCount: number;
       totalAmount: number;
@@ -215,29 +211,13 @@ export class WorksService implements OnModuleInit {
         month: row.month,
         clientId: row.clientId,
         clientName: row.clientName,
-        source: 'document',
+        source: row.source,
         worksCount: row.worksCount,
         paidWorksCount: row.paidWorksCount,
         totalAmount: row.totalAmount,
         totalCreditedAmount: row.totalCreditedAmount,
-        totalPlatformCommission: 0,
-        totalPayoutCommission: 0
-      })
-    );
-
-    incomeRows.forEach((row) =>
-      pushRow({
-        year: row.year,
-        month: row.month,
-        clientId: row.clientId,
-        clientName: row.clientName,
-        source: row.source,
-        worksCount: row.entriesCount,
-        paidWorksCount: row.paidEntriesCount,
-        totalAmount: row.grossAmount,
-        totalCreditedAmount: row.netAmount,
-        totalPlatformCommission: row.platformCommission,
-        totalPayoutCommission: row.payoutCommission
+        totalPlatformCommission: row.totalPlatformCommission,
+        totalPayoutCommission: row.totalPayoutCommission
       })
     );
 
@@ -301,6 +281,10 @@ export class WorksService implements OnModuleInit {
           creditedAmount,
           isPayed: dto.isPayed ?? false,
           currency: dto.currency ?? 'RUB',
+          source: dto.source ?? 'document',
+          sourceName: dto.sourceName?.trim() || (dto.source === 'kwork' ? 'Kwork' : undefined),
+          platformCommission: this.normalizeNonNegativeAmount(dto.platformCommission, 0, 'Комиссия площадки'),
+          payoutCommission: this.normalizeNonNegativeAmount(dto.payoutCommission, 0, 'Комиссия платежной системы'),
           executorOrganizationId: new Types.ObjectId(dto.executorOrganizationId),
           clientId: new Types.ObjectId(dto.clientId),
           actNumber,
@@ -360,6 +344,19 @@ export class WorksService implements OnModuleInit {
       }
       if (dto.invoiceDate) {
         payload.invoiceDate = new Date(dto.invoiceDate);
+      }
+      if (dto.sourceName !== undefined) {
+        payload.sourceName = dto.sourceName.trim() || undefined;
+      }
+      if (dto.platformCommission !== undefined) {
+        payload.platformCommission = this.normalizeNonNegativeAmount(dto.platformCommission, 0, 'Комиссия площадки');
+      }
+      if (dto.payoutCommission !== undefined) {
+        payload.payoutCommission = this.normalizeNonNegativeAmount(
+          dto.payoutCommission,
+          0,
+          'Комиссия платежной системы'
+        );
       }
       payload.actNumber = actNumber;
       payload.invoiceNumber = invoiceNumber;
@@ -1160,6 +1157,24 @@ export class WorksService implements OnModuleInit {
     }
 
     return creditedAmount;
+  }
+
+  private normalizeNonNegativeAmount(value: unknown, fallback: number, fieldName: string): number {
+    const safeFallback = Number.isFinite(fallback) && fallback >= 0 ? fallback : 0;
+    if (value === undefined || value === null || value === '') {
+      return safeFallback;
+    }
+
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+      throw new ValidationServiceException(`${fieldName} указана некорректно`);
+    }
+
+    if (amount < 0) {
+      throw new ValidationServiceException(`${fieldName} не может быть отрицательной`);
+    }
+
+    return amount;
   }
 
   private areAmountsEqual(left: number, right: number): boolean {

@@ -43,7 +43,7 @@ export default function ReportPage() {
             <Stack gap={4}>
               <Title order={2}>Отчет</Title>
               <Text size="sm" c="dimmed">
-                Сводная книга доходов: прямые счета/акты и отдельные поступления с площадок.
+                Сводная книга работ: прямые счета/акты и поступления Kwork в одном реестре.
               </Text>
             </Stack>
             <Switch

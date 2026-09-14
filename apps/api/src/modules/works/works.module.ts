@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { ClientsModule } from '../clients/clients.module';
-import { IncomesModule } from '../incomes/incomes.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { WorkBalanceImportService } from './work-balance-import.service';
 import { Work, WorkSchema } from './work.schema';
 import { WorkUpdPdfService } from './work-upd-pdf.service';
 import { WorksController } from './works.controller';
@@ -14,10 +14,9 @@ import { WorksService } from './works.service';
   imports: [
     MongooseModule.forFeature([{ name: Work.name, schema: WorkSchema }]),
     OrganizationsModule,
-    ClientsModule,
-    IncomesModule
+    ClientsModule
   ],
   controllers: [WorksController],
-  providers: [WorksRepository, WorksService, WorkUpdPdfService]
+  providers: [WorksRepository, WorksService, WorkUpdPdfService, WorkBalanceImportService]
 })
 export class WorksModule {}

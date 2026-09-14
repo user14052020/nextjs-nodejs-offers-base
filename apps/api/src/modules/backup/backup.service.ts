@@ -17,7 +17,6 @@ type BackupStream = {
 const BACKUP_DATE_FIELDS_BY_COLLECTION: Record<string, string[]> = {
   clients: ['createdAt', 'updatedAt'],
   files: ['createdAt', 'updatedAt'],
-  incomes: ['incomeDate', 'receiptDate', 'createdAt', 'updatedAt'],
   organizations: ['createdAt', 'updatedAt'],
   sequences: ['createdAt', 'updatedAt'],
   users: ['createdAt', 'updatedAt'],
@@ -80,7 +79,9 @@ export class BackupService {
       throw new ValidationServiceException('В бэкапе отсутствует раздел collections');
     }
 
-    const backupCollections = Object.entries(collectionsRaw as Record<string, unknown>);
+    const backupCollections = Object.entries(collectionsRaw as Record<string, unknown>).filter(
+      ([name]) => !this.isIgnoredCollection(name)
+    );
     for (const [name, documents] of backupCollections) {
       if (!name.trim()) {
         throw new ValidationServiceException('Найдено пустое имя коллекции в бэкапе');
@@ -95,6 +96,10 @@ export class BackupService {
       .filter((name) => !name.startsWith('system.'));
 
     for (const name of existingCollections) {
+      if (this.isIgnoredCollection(name)) {
+        await db.collection(name).drop().catch(() => undefined);
+        continue;
+      }
       await db.collection(name).deleteMany({});
     }
 
@@ -107,7 +112,8 @@ export class BackupService {
         .map((document) => this.normalizeDocumentIds(name, document))
         .filter((document): document is Record<string, unknown> => {
           return Boolean(document && typeof document === 'object' && !Array.isArray(document));
-        });
+        })
+        .filter((document) => !this.isIgnoredDocument(name, document));
 
       restoredByCollection.set(name, restored);
 
@@ -160,6 +166,7 @@ export class BackupService {
     const collections = (await db.listCollections({}, { nameOnly: true }).toArray())
       .map((collection) => collection.name)
       .filter((name) => !name.startsWith('system.'))
+      .filter((name) => !this.isIgnoredCollection(name))
       .sort((left, right) => left.localeCompare(right));
 
     const meta = {
@@ -178,6 +185,9 @@ export class BackupService {
       const cursor = db.collection(name).find({});
       let firstDocument = true;
       for await (const document of cursor) {
+        if (this.isIgnoredDocument(name, document)) {
+          continue;
+        }
         const payload = this.stringifyDocument(document);
         await this.writeChunk(gzip, `${firstDocument ? '' : ','}${payload}`);
         firstDocument = false;
@@ -357,7 +367,6 @@ export class BackupService {
     switch (collectionName) {
       case 'organizations':
       case 'clients':
-      case 'incomes':
       case 'works':
       case 'files':
       case 'users':
@@ -373,11 +382,7 @@ export class BackupService {
       normalizeIdField('executorOrganizationId');
       normalizeIdField('clientId');
       normalized.isPayed = typeof normalized.isPayed === 'boolean' ? normalized.isPayed : false;
-    }
-
-    if (collectionName === 'incomes') {
-      normalized.source = normalized.source === 'kwork' || normalized.source === 'manual' ? normalized.source : 'manual';
-      normalized.sourceName = typeof normalized.sourceName === 'string' ? normalized.sourceName : 'Ручной доход';
+      normalized.source = normalized.source === 'kwork' ? 'kwork' : 'document';
       normalized.platformCommission =
         typeof normalized.platformCommission === 'number' && Number.isFinite(normalized.platformCommission)
           ? normalized.platformCommission
@@ -386,31 +391,6 @@ export class BackupService {
         typeof normalized.payoutCommission === 'number' && Number.isFinite(normalized.payoutCommission)
           ? normalized.payoutCommission
           : 0;
-      normalized.currency = typeof normalized.currency === 'string' ? normalized.currency : 'RUB';
-      normalized.isReceived = typeof normalized.isReceived === 'boolean' ? normalized.isReceived : true;
-      normalized.paymentMethod =
-        ['platform', 'bank_account', 'card_transfer', 'cash', 'other'].includes(String(normalized.paymentMethod))
-          ? normalized.paymentMethod
-          : normalized.source === 'kwork'
-            ? 'platform'
-            : 'card_transfer';
-      normalized.confirmationDocumentType =
-        ['platform_report', 'receipt', 'none'].includes(String(normalized.confirmationDocumentType))
-          ? normalized.confirmationDocumentType
-          : normalized.source === 'kwork'
-            ? 'platform_report'
-            : 'receipt';
-      normalized.taxRegime = typeof normalized.taxRegime === 'string' ? normalized.taxRegime : 'ПСН';
-      normalized.cashRegisterExemptionReason =
-        typeof normalized.cashRegisterExemptionReason === 'string'
-          ? normalized.cashRegisterExemptionReason
-          : 'ККТ не применяется: ПСН, п. 2.1 ст. 2 54-ФЗ';
-      if (normalized.receiptNumber && !normalized.receiptDate) {
-        normalized.receiptDate = normalized.incomeDate;
-      }
-      if (normalized.receiptDate instanceof Date) {
-        normalized.receiptYear = normalized.receiptDate.getFullYear();
-      }
     }
 
     if (collectionName === 'files') {
@@ -542,6 +522,14 @@ export class BackupService {
         clientName: clientId ? clientNames.get(clientId) : undefined
       });
     }
+  }
+
+  private isIgnoredCollection(name: string) {
+    return name === 'incomes';
+  }
+
+  private isIgnoredDocument(collectionName: string, document: Record<string, unknown>) {
+    return collectionName === 'sequences' && this.readString(document.name)?.startsWith('income-receipt-');
   }
 
   private readString(value: unknown) {

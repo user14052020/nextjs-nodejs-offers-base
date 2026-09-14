@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 
 import { ValidationServiceException } from '../../common/errors/service.exception';
-import { IncomesRepository } from './incomes.repository';
-import { IncomesService } from './incomes.service';
+import { ClientsService } from '../clients/clients.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { WorksRepository } from './works.repository';
+import { WorksService } from './works.service';
 
 type BalanceReportImportRow = {
   sheetName: string;
@@ -32,12 +34,14 @@ export type BalanceReportImportResult = {
 };
 
 @Injectable()
-export class IncomeBalanceImportService {
+export class WorkBalanceImportService {
   private static readonly targetSheetNames = ['Операции вне баланса', 'Пополнение баланса'];
 
   constructor(
-    private readonly incomesRepository: IncomesRepository,
-    private readonly incomesService: IncomesService
+    private readonly worksRepository: WorksRepository,
+    private readonly worksService: WorksService,
+    private readonly organizationsService: OrganizationsService,
+    private readonly clientsService: ClientsService
   ) {}
 
   async importFromBuffer(buffer: Buffer): Promise<BalanceReportImportResult> {
@@ -47,6 +51,7 @@ export class IncomeBalanceImportService {
 
     const workbook = this.readWorkbook(buffer);
     const parsed = this.parseWorkbook(workbook);
+    const defaults = await this.resolveImportDefaults();
 
     let importedRows = 0;
     let skippedDuplicates = 0;
@@ -57,21 +62,19 @@ export class IncomeBalanceImportService {
         continue;
       }
 
-      await this.incomesService.create({
+      await this.worksService.create({
+        items: [{ name: row.description, quantity: 1, price: row.grossAmount }],
+        creditedAmount: row.netAmount,
+        isPayed: true,
+        currency: 'RUB',
+        executorOrganizationId: defaults.organizationId,
+        clientId: defaults.clientId,
+        actDate: row.date.toISOString(),
+        invoiceDate: row.date.toISOString(),
         source: 'kwork',
         sourceName: 'Kwork',
-        incomeDate: row.date.toISOString(),
-        description: row.description,
-        customerName: row.customerName,
-        orderTitle: row.orderTitle,
-        grossAmount: row.grossAmount,
-        netAmount: row.netAmount,
         platformCommission: Math.max(0, row.grossAmount - row.netAmount),
-        payoutCommission: 0,
-        currency: 'RUB',
-        isReceived: true,
-        paymentMethod: 'platform',
-        confirmationDocumentType: 'platform_report'
+        payoutCommission: 0
       });
       importedRows += 1;
     }
@@ -83,6 +86,29 @@ export class IncomeBalanceImportService {
       skippedDuplicates,
       skippedRows: parsed.warnings.length,
       warnings: parsed.warnings
+    };
+  }
+
+  private async resolveImportDefaults() {
+    const [organizations, clients] = await Promise.all([
+      this.organizationsService.findAll(),
+      this.clientsService.findAll()
+    ]);
+    const organization = organizations[0] as { _id?: { toString: () => string } | string } | undefined;
+    const client = clients.find((item) => Boolean((item as { isPhysicalPerson?: boolean }).isPhysicalPerson)) as
+      | { _id?: { toString: () => string } | string }
+      | undefined;
+
+    if (!organization?._id) {
+      throw new ValidationServiceException('Для импорта Kwork нужна хотя бы одна организация');
+    }
+    if (!client?._id) {
+      throw new ValidationServiceException('Для импорта Kwork нужен клиент с признаком "Это физлицо"');
+    }
+
+    return {
+      organizationId: organization._id.toString(),
+      clientId: client._id.toString()
     };
   }
 
@@ -103,7 +129,7 @@ export class IncomeBalanceImportService {
     const warnings: BalanceReportImportWarning[] = [];
     let totalRows = 0;
 
-    for (const sheetName of IncomeBalanceImportService.targetSheetNames) {
+    for (const sheetName of WorkBalanceImportService.targetSheetNames) {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
         warnings.push({ sheetName, rowNumber: 0, message: 'Лист не найден' });
@@ -214,19 +240,22 @@ export class IncomeBalanceImportService {
   }
 
   private async hasDuplicate(row: BalanceReportImportRow): Promise<boolean> {
-    const candidates = await this.incomesRepository.findDuplicateImportCandidates({
-      incomeDate: row.date,
-      description: row.description,
-      grossAmount: row.grossAmount,
-      netAmount: row.netAmount
+    const candidates = await this.worksRepository.findDuplicateImportCandidates({
+      documentDate: row.date,
+      itemName: row.description
     });
 
     return candidates.some((candidate) => {
+      const creditedAmount =
+        typeof candidate.creditedAmount === 'number' && Number.isFinite(candidate.creditedAmount)
+          ? candidate.creditedAmount
+          : candidate.amount;
+      const sameDocumentDate = this.sameDate(candidate.actDate, row.date) || this.sameDate(candidate.invoiceDate, row.date);
       return (
-        this.sameDate(candidate.incomeDate, row.date) &&
-        this.sameMoney(Number(candidate.grossAmount), row.grossAmount) &&
-        this.sameMoney(Number(candidate.netAmount), row.netAmount) &&
-        this.normalizeText(candidate.description) === this.normalizeText(row.description)
+        sameDocumentDate &&
+        this.sameMoney(Number(candidate.amount), row.grossAmount) &&
+        this.sameMoney(Number(creditedAmount), row.netAmount) &&
+        candidate.items.some((item) => this.normalizeText(item.name) === this.normalizeText(row.description))
       );
     });
   }
@@ -267,7 +296,7 @@ export class IncomeBalanceImportService {
 
   private parseDate(value: unknown): Date | null {
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      return value;
+      return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
     }
 
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -279,12 +308,21 @@ export class IncomeBalanceImportService {
     }
 
     const text = this.stringifyCell(value).trim();
-    const match = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(text);
-    if (!match) {
+    const isoMatch = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(text);
+    if (isoMatch) {
+      const [, year, month, day, hour = '00', minute = '00', second = '00'] = isoMatch;
+      const date = new Date(
+        Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second))
+      );
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    const ruMatch = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(text);
+    if (!ruMatch) {
       return null;
     }
 
-    const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+    const [, day, month, year, hour = '00', minute = '00', second = '00'] = ruMatch;
     const date = new Date(
       Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second))
     );
@@ -309,7 +347,12 @@ export class IncomeBalanceImportService {
   }
 
   private sameDate(left: Date | string, right: Date): boolean {
-    return new Date(left).getTime() === right.getTime();
+    const leftDate = new Date(left);
+    return (
+      leftDate.getUTCFullYear() === right.getUTCFullYear() &&
+      leftDate.getUTCMonth() === right.getUTCMonth() &&
+      leftDate.getUTCDate() === right.getUTCDate()
+    );
   }
 
   private sameMoney(left: number, right: number): boolean {

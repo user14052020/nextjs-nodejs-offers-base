@@ -1,7 +1,7 @@
 export type MonthlyClientReportRow = {
   clientId: string;
   clientName: string;
-  source: 'document' | 'kwork' | 'manual';
+  source: 'document' | 'kwork';
   worksCount: number;
   paidWorksCount: number;
   totalAmount: number;

@@ -53,9 +53,6 @@ export const TopNav: React.FC = () => {
           <Button component={Link} href="/works" variant="subtle" color="gray">
             Работы
           </Button>
-          <Button component={Link} href="/incomes" variant="subtle" color="gray">
-            Доходы
-          </Button>
           <Button component={Link} href="/report" variant="subtle" color="gray">
             Отчет
           </Button>

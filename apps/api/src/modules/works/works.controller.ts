@@ -1,17 +1,36 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 
+import { ValidationServiceException } from '../../common/errors/service.exception';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateWorkDto } from './dto/create-work.dto';
 import { UpdateWorkDto } from './dto/update-work.dto';
+import { WorkBalanceImportService } from './work-balance-import.service';
 import { WorksService } from './works.service';
 
 @Controller('works')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class WorksController {
-  constructor(private readonly worksService: WorksService) {}
+  constructor(
+    private readonly worksService: WorksService,
+    private readonly workBalanceImportService: WorkBalanceImportService
+  ) {}
 
   @Get()
   findAll(@Query('q') query?: string) {
@@ -32,6 +51,17 @@ export class WorksController {
   @Roles('admin')
   create(@Body() dto: CreateWorkDto) {
     return this.worksService.create(dto);
+  }
+
+  @Post('imports/kwork-balance-report')
+  @Roles('admin')
+  @UseInterceptors(FileInterceptor('file'))
+  importKworkBalanceReport(@UploadedFile() file?: Express.Multer.File) {
+    if (!file?.buffer?.length) {
+      throw new ValidationServiceException('Файл импорта не передан');
+    }
+
+    return this.workBalanceImportService.importFromBuffer(file.buffer);
   }
 
   @Patch(':id')

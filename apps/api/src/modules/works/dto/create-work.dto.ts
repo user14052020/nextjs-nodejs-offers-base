@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -49,6 +50,26 @@ export class CreateWorkDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @IsOptional()
+  @IsIn(['document', 'kwork'])
+  source?: 'document' | 'kwork';
+
+  @IsOptional()
+  @IsString()
+  sourceName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  platformCommission?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  payoutCommission?: number;
 
   @IsMongoId()
   executorOrganizationId: string;
