@@ -440,7 +440,7 @@ export class WorksService implements OnModuleInit {
     const normalizedNumber = this.sanitizeFilenamePart(number || 'без номера');
     const normalizedDate = this.sanitizeFilenamePart(this.formatDate(date));
 
-    return `${documentType}№${normalizedNumber}ОТ${normalizedDate}.pdf`;
+    return `${documentType}№${normalizedNumber}от${normalizedDate}.pdf`;
   }
 
   private sanitizeFilenamePart(value: string) {
