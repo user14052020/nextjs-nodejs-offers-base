@@ -40,6 +40,7 @@ export class SearchService implements OnModuleInit {
     phone?: string;
     signerName?: string;
     chiefAccountant?: string;
+    registrationDetails?: string;
   }) {
     await this.indexDocument(ORGANIZATIONS_INDEX, document.id, document);
   }
@@ -60,7 +61,8 @@ export class SearchService implements OnModuleInit {
       'email',
       'phone',
       'signerName^2',
-      'chiefAccountant^2'
+      'chiefAccountant^2',
+      'registrationDetails^2'
     ]);
   }
 
@@ -177,6 +179,7 @@ export class SearchService implements OnModuleInit {
           contract: { type: 'text', fields: { keyword: { type: 'keyword' } } },
           signerName: { type: 'text', fields: { keyword: { type: 'keyword' } } },
           chiefAccountant: { type: 'text', fields: { keyword: { type: 'keyword' } } },
+          registrationDetails: { type: 'text', fields: { keyword: { type: 'keyword' } } },
           actNumber: { type: 'text', fields: { keyword: { type: 'keyword' } } },
           invoiceNumber: { type: 'text', fields: { keyword: { type: 'keyword' } } },
           executorOrganizationName: { type: 'text', fields: { keyword: { type: 'keyword' } } },

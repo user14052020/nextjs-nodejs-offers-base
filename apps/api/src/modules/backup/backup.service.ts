@@ -465,7 +465,8 @@ export class BackupService {
         email: this.readString(organization.email),
         phone: this.readString(organization.phone),
         signerName: this.readString(organization.signerName),
-        chiefAccountant: this.readString(organization.chiefAccountant)
+        chiefAccountant: this.readString(organization.chiefAccountant),
+        registrationDetails: this.readString(organization.registrationDetails)
       });
     }
 

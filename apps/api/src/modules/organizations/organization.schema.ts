@@ -44,6 +44,9 @@ export class Organization {
   @Prop()
   chiefAccountant?: string;
 
+  @Prop()
+  registrationDetails?: string;
+
   @Prop({ type: [{ type: Types.ObjectId, ref: 'File' }], default: [] })
   files: Types.ObjectId[];
 }

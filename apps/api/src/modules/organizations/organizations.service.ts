@@ -33,7 +33,8 @@ export class OrganizationsService implements OnModuleInit {
           email: row.email,
           phone: row.phone,
           signerName: row.signerName,
-          chiefAccountant: row.chiefAccountant
+          chiefAccountant: row.chiefAccountant,
+          registrationDetails: row.registrationDetails
         })
       )
     );
@@ -79,7 +80,8 @@ export class OrganizationsService implements OnModuleInit {
       email: created.email,
       phone: created.phone,
       signerName: created.signerName,
-      chiefAccountant: created.chiefAccountant
+      chiefAccountant: created.chiefAccountant,
+      registrationDetails: created.registrationDetails
     });
 
     return created;
@@ -106,7 +108,8 @@ export class OrganizationsService implements OnModuleInit {
       email: updated.email,
       phone: updated.phone,
       signerName: updated.signerName,
-      chiefAccountant: updated.chiefAccountant
+      chiefAccountant: updated.chiefAccountant,
+      registrationDetails: updated.registrationDetails
     });
 
     return updated;

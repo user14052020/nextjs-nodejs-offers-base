@@ -24,6 +24,7 @@ type PartyLike = {
   contract?: string;
   signerName?: string;
   chiefAccountant?: string;
+  registrationDetails?: string;
   isPhysicalPerson?: boolean;
 };
 
@@ -156,7 +157,7 @@ export class WorkUpdPdfService {
       ['Грузоотправитель и его адрес:', 'он же', '(3)', false],
       ['Грузополучатель и его адрес:', '-', '(4)', false],
       ['К платежно-расчетному документу №', '', '(5)', false],
-      ['Документ об отгрузке:', '', '(5а)', false],
+      ['Документ об отгрузке:', this.buildShipmentDocumentLine(invoiceNumber, invoiceDate), '(5а)', false],
       ['Покупатель:', buyerName, '(6)', true],
       ['Адрес:', this.clean(client.address) || '-', '(6а)', false],
       ['ИНН/КПП покупателя:', this.innKpp(client), '(6б)', false],
@@ -454,10 +455,9 @@ export class WorkUpdPdfService {
     const chiefAccountant = this.clean(organization.chiefAccountant);
     const managerSigner = isSellerIp ? '' : signer;
     const buyerSigner = this.personShortName(client.signerName) || (client.isPhysicalPerson ? this.personShortName(client.name) : '');
-    const basis =
-      this.clean(client.contract) ||
-      'Без документа-основания отгрузки товаров (передачи результатов работ), передачи имущественных прав (предъявления оказанных услуг)';
+    const basis = this.buildInvoiceBasis(work);
     const [day, month, year] = this.formatUpdDateParts(work.actDate || work.invoiceDate);
+    const registrationDetails = this.clean(organization.registrationDetails);
 
     this.drawVerticalRule(doc, 85.8, 0, 75.8, 1.5);
     this.drawHorizontalRule(doc, 85.8, this.page.right, 75.8, 1.5);
@@ -490,6 +490,7 @@ export class WorkUpdPdfService {
     this.drawHorizontalRule(doc, 390.8, 598.5, 61.5);
     this.drawHorizontalRule(doc, 598.5, 823, 61.5);
     this.drawTextBox(doc, fonts, signer, 392, 47, 205, 13, { size: 6.1, align: 'center' });
+    this.drawTextBox(doc, fonts, registrationDetails, 600, 52.2, 221, 8, { size: 5.2, align: 'center' });
     this.drawTextBox(doc, fonts, '(подпись)', 238.5, 64, 152.3, 8, { size: 4.4, align: 'center' });
     this.drawTextBox(doc, fonts, '(ф.и.о.)', 390.8, 64, 207.7, 8, { size: 4.4, align: 'center' });
     this.drawTextBox(doc, fonts, '(реквизиты свидетельства о государственной регистрации индивидуального предпринимателя)', 598.5, 64, 224.5, 8, {
@@ -772,6 +773,16 @@ export class WorkUpdPdfService {
       return `${inn} / ${kpp}`;
     }
     return inn || kpp || '-';
+  }
+
+  private buildInvoiceBasis(work: WorkLike) {
+    const invoiceNumber = this.clean(work.invoiceNumber || work.actNumber) || '-';
+    const invoiceDate = this.formatDate(work.invoiceDate || work.actDate);
+    return `Счет № ${invoiceNumber} от ${invoiceDate}`;
+  }
+
+  private buildShipmentDocumentLine(number: string, date: string) {
+    return `Универсальный передаточный документ, № ${number || '-'} от ${date || '-'}`;
   }
 
   private personShortName(value?: string) {

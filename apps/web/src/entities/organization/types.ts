@@ -15,5 +15,6 @@ export type Organization = {
   phone?: string;
   signerName?: string;
   chiefAccountant?: string;
+  registrationDetails?: string;
   files?: StoredFile[];
 };

@@ -21,7 +21,8 @@ const EMPTY_FORM = {
   email: '',
   phone: '',
   signerName: '',
-  chiefAccountant: ''
+  chiefAccountant: '',
+  registrationDetails: ''
 };
 
 export const OrganizationForm: React.FC<{
@@ -53,7 +54,8 @@ export const OrganizationForm: React.FC<{
       email: editingItem.email || '',
       phone: editingItem.phone || '',
       signerName: editingItem.signerName || '',
-      chiefAccountant: editingItem.chiefAccountant || ''
+      chiefAccountant: editingItem.chiefAccountant || '',
+      registrationDetails: editingItem.registrationDetails || ''
     });
   }, [editingItem]);
 
@@ -137,6 +139,12 @@ export const OrganizationForm: React.FC<{
             <TextInput
               value={form.chiefAccountant}
               onChange={(event) => handleChange('chiefAccountant', event.currentTarget.value)}
+            />
+          </Field>
+          <Field label="Реквизиты госрегистрации ИП">
+            <TextInput
+              value={form.registrationDetails}
+              onChange={(event) => handleChange('registrationDetails', event.currentTarget.value)}
             />
           </Field>
         </SimpleGrid>

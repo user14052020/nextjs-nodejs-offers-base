@@ -52,4 +52,8 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsString()
   chiefAccountant?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationDetails?: string;
 }
