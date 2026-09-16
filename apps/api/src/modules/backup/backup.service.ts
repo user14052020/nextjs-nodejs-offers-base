@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
-import { Binary, ObjectId } from 'mongodb';
+import { Binary, Collection, ObjectId } from 'mongodb';
 import { once } from 'node:events';
 import { PassThrough, Readable } from 'node:stream';
 import { createGzip, gunzipSync, Gzip } from 'node:zlib';
@@ -91,6 +91,24 @@ export class BackupService {
       }
     }
 
+    let restoredDocuments = 0;
+    const idRewrites = this.buildIdRewrites(backupCollections);
+    const restoredByCollection = new Map<string, Record<string, unknown>[]>();
+    for (const [name, documents] of backupCollections) {
+      const restored = (documents as unknown[])
+        .map((document) => this.reviveExtendedJson(document))
+        .map((document) => this.normalizeDocumentDates(name, document))
+        .map((document) => this.normalizeDocumentIds(name, document, idRewrites))
+        .map((document) => this.normalizeRestoredDocument(name, document))
+        .filter((document): document is Record<string, unknown> => {
+          return Boolean(document && typeof document === 'object' && !Array.isArray(document));
+        })
+        .filter((document) => !this.isIgnoredDocument(name, document));
+
+      restoredByCollection.set(name, restored);
+      restoredDocuments += restored.length;
+    }
+
     const existingCollections = (await db.listCollections({}, { nameOnly: true }).toArray())
       .map((collection) => collection.name)
       .filter((name) => !name.startsWith('system.'));
@@ -103,23 +121,17 @@ export class BackupService {
       await db.collection(name).deleteMany({});
     }
 
-    let restoredDocuments = 0;
-    const restoredByCollection = new Map<string, Record<string, unknown>[]>();
-    for (const [name, documents] of backupCollections) {
-      const restored = (documents as unknown[])
-        .map((document) => this.reviveExtendedJson(document))
-        .map((document) => this.normalizeDocumentDates(name, document))
-        .map((document) => this.normalizeDocumentIds(name, document))
-        .filter((document): document is Record<string, unknown> => {
-          return Boolean(document && typeof document === 'object' && !Array.isArray(document));
-        })
-        .filter((document) => !this.isIgnoredDocument(name, document));
+    await this.prepareIndexesForRestore(db);
 
-      restoredByCollection.set(name, restored);
-
+    for (const [name, restored] of restoredByCollection.entries()) {
       if (restored.length > 0) {
-        await db.collection(name).insertMany(restored, { ordered: true });
-        restoredDocuments += restored.length;
+        try {
+          await db.collection(name).insertMany(restored, { ordered: true });
+        } catch (error) {
+          throw new ValidationServiceException(
+            `Не удалось восстановить коллекцию "${name}": ${this.errorMessage(error)}`
+          );
+        }
       }
     }
 
@@ -338,7 +350,11 @@ export class BackupService {
     return Number.isNaN(parsed.getTime()) ? value : parsed;
   }
 
-  private normalizeDocumentIds(collectionName: string, document: unknown): unknown {
+  private normalizeDocumentIds(
+    collectionName: string,
+    document: unknown,
+    idRewrites: Map<string, ObjectId>
+  ): unknown {
     if (!document || typeof document !== 'object' || Array.isArray(document)) {
       return document;
     }
@@ -347,7 +363,7 @@ export class BackupService {
 
     const normalizeIdField = (field: string) => {
       if (field in normalized) {
-        normalized[field] = this.toObjectIdMaybe(normalized[field], true);
+        normalized[field] = this.toObjectIdMaybe(normalized[field], true, idRewrites);
       }
     };
 
@@ -361,7 +377,7 @@ export class BackupService {
         return;
       }
 
-      normalized[field] = value.map((item) => this.toObjectIdMaybe(item, true));
+      normalized[field] = value.map((item) => this.toObjectIdMaybe(item, true, idRewrites));
     };
 
     switch (collectionName) {
@@ -408,9 +424,139 @@ export class BackupService {
     return normalized;
   }
 
-  private toObjectIdMaybe(value: unknown, unwrapNested = false): unknown {
+  private async prepareIndexesForRestore(db: NonNullable<Connection['db']>) {
+    const works = db.collection('works');
+    await this.dropIndexIfExists(works, 'actNumber_1');
+    await this.dropIndexIfExists(works, 'invoiceNumber_1');
+    await works.createIndex({ actYear: 1, actNumber: 1 }, { unique: true, name: 'actYear_1_actNumber_1' });
+    await works.createIndex(
+      { invoiceYear: 1, invoiceNumber: 1 },
+      { unique: true, name: 'invoiceYear_1_invoiceNumber_1' }
+    );
+  }
+
+  private async dropIndexIfExists(collection: Collection, indexName: string) {
+    const indexes = await collection.indexes().catch(() => []);
+    const existing = indexes.find((index) => index.name === indexName);
+    if (!existing) {
+      return;
+    }
+
+    await collection.dropIndex(indexName).catch((error) => {
+      const message = this.errorMessage(error);
+      if (!message.includes('index not found') && !message.includes('IndexNotFound')) {
+        throw error;
+      }
+    });
+  }
+
+  private normalizeRestoredDocument(collectionName: string, document: unknown): unknown {
+    if (!document || typeof document !== 'object' || Array.isArray(document)) {
+      return document;
+    }
+
+    const normalized = { ...(document as Record<string, unknown>) };
+
+    if (collectionName === 'works') {
+      const items = this.normalizeWorkItemsForRestore(normalized.items);
+      const amount = items.reduce((sum, item) => sum + item.amount, 0);
+      const actDate = this.requireDate(normalized.actDate ?? normalized.invoiceDate);
+      const invoiceDate = this.requireDate(normalized.invoiceDate ?? actDate);
+
+      normalized.items = items;
+      normalized.amount = amount;
+      normalized.creditedAmount = this.readFiniteNumber(normalized.creditedAmount, amount);
+      normalized.currency = this.readString(normalized.currency) || 'RUB';
+      normalized.source = normalized.source === 'kwork' ? 'kwork' : 'document';
+      normalized.sourceName =
+        this.readString(normalized.sourceName) || (normalized.source === 'kwork' ? 'Kwork' : 'Счет/акт');
+      normalized.platformCommission = this.readFiniteNumber(normalized.platformCommission, 0);
+      normalized.payoutCommission = this.readFiniteNumber(normalized.payoutCommission, 0);
+      normalized.isPayed = typeof normalized.isPayed === 'boolean' ? normalized.isPayed : false;
+      normalized.actDate = actDate;
+      normalized.invoiceDate = invoiceDate;
+      normalized.actYear = this.readYear(normalized.actYear, actDate);
+      normalized.invoiceYear = this.readYear(normalized.invoiceYear, invoiceDate);
+      normalized.actNumber = this.readString(normalized.actNumber) || '';
+      normalized.invoiceNumber = this.readString(normalized.invoiceNumber) || normalized.actNumber;
+    }
+
+    if (collectionName === 'clients') {
+      normalized.isPhysicalPerson = typeof normalized.isPhysicalPerson === 'boolean' ? normalized.isPhysicalPerson : false;
+    }
+
+    if (collectionName === 'uploads.chunks' && 'data' in normalized) {
+      normalized.data = this.normalizeGridFsChunkData(normalized.data);
+    }
+
+    return normalized;
+  }
+
+  private buildIdRewrites(backupCollections: Array<[string, unknown]>) {
+    const rewrites = new Map<string, ObjectId>();
+    const objectIdCollections = new Set([
+      'organizations',
+      'clients',
+      'works',
+      'files',
+      'users',
+      'uploads.files',
+      'uploads.chunks'
+    ]);
+
+    for (const [collectionName, documents] of backupCollections) {
+      if (!objectIdCollections.has(collectionName) || !Array.isArray(documents)) {
+        continue;
+      }
+
+      for (const document of documents) {
+        if (!document || typeof document !== 'object' || Array.isArray(document)) {
+          continue;
+        }
+
+        const id = this.readBackupId((document as Record<string, unknown>)._id);
+        if (id && !ObjectId.isValid(id) && !rewrites.has(id)) {
+          rewrites.set(id, new ObjectId());
+        }
+      }
+    }
+
+    return rewrites;
+  }
+
+  private readBackupId(value: unknown): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (value instanceof ObjectId) {
+      return value.toHexString();
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const candidate = value as { _id?: unknown; id?: unknown; $oid?: unknown };
+      return this.readBackupId(candidate.$oid ?? candidate._id ?? candidate.id);
+    }
+
+    return undefined;
+  }
+
+  private toObjectIdMaybe(
+    value: unknown,
+    unwrapNested = false,
+    idRewrites: Map<string, ObjectId> = new Map()
+  ): unknown {
     if (value instanceof ObjectId) {
       return value;
+    }
+
+    const backupId = this.readBackupId(value);
+    if (backupId && idRewrites.has(backupId)) {
+      return idRewrites.get(backupId);
     }
 
     if (typeof value === 'string' && ObjectId.isValid(value)) {
@@ -432,6 +578,76 @@ export class BackupService {
     }
 
     return value;
+  }
+
+  private normalizeWorkItemsForRestore(value: unknown) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+          return undefined;
+        }
+
+        const record = item as Record<string, unknown>;
+        const quantity = this.readFiniteNumber(record.quantity, 1);
+        const price = this.readFiniteNumber(record.price, this.readFiniteNumber(record.amount, 0));
+        const amount = quantity * price;
+        const name = this.readString(record.name)?.trim();
+        if (!name || quantity <= 0 || price < 0) {
+          return undefined;
+        }
+
+        return { name, quantity, price, amount };
+      })
+      .filter((item): item is { name: string; quantity: number; price: number; amount: number } => Boolean(item));
+  }
+
+  private requireDate(value: unknown) {
+    const normalized = this.toDateMaybe(value);
+    return normalized instanceof Date && !Number.isNaN(normalized.getTime()) ? normalized : new Date();
+  }
+
+  private readYear(value: unknown, fallbackDate: Date) {
+    return typeof value === 'number' && Number.isInteger(value) ? value : fallbackDate.getFullYear();
+  }
+
+  private readFiniteNumber(value: unknown, fallback: number) {
+    const number = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  private normalizeGridFsChunkData(value: unknown) {
+    if (value instanceof Binary) {
+      return value;
+    }
+
+    if (Buffer.isBuffer(value)) {
+      return new Binary(value);
+    }
+
+    if (typeof value === 'string') {
+      return new Binary(Buffer.from(value, 'base64'));
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const candidate = value as { type?: unknown; data?: unknown };
+      if (candidate.type === 'Buffer' && Array.isArray(candidate.data)) {
+        return new Binary(Buffer.from(candidate.data as number[]));
+      }
+    }
+
+    return value;
+  }
+
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
   }
 
   private async rebuildSearchIndices(restoredByCollection: Map<string, Record<string, unknown>[]>) {
