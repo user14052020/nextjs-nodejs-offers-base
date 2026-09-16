@@ -116,15 +116,24 @@ export class WorkUpdPdfService {
   ) {
     const sideX = 18;
     const sideRight = 87;
-    const labelX = 96;
-    const valueX = 276;
     const codeX = 800;
-    const lineRight = 800;
     const invoiceNumber = this.clean(work.invoiceNumber || work.actNumber) || '-';
     const invoiceDate = this.formatDate(work.invoiceDate || work.actDate);
     const actDate = this.formatDate(work.actDate || work.invoiceDate);
     const sellerName = this.partyName(organization);
     const buyerName = this.partyName(client);
+    const leftColumn = {
+      labelX: 96,
+      valueX: 207,
+      lineRight: 452,
+      codeX: 454
+    };
+    const rightColumn = {
+      labelX: 470,
+      valueX: 586,
+      lineRight: 800,
+      codeX
+    };
 
     this.drawVerticalRule(doc, sideX, 55.5, 234.75, 0.75);
     this.drawVerticalRule(doc, sideRight, 55.5, 234.75, 1.5);
@@ -150,33 +159,59 @@ export class WorkUpdPdfService {
     this.drawInvoiceTopLine(doc, fonts, 'Счет-фактура N', invoiceNumber, invoiceDate, '(1)', 74.5);
     this.drawInvoiceTopLine(doc, fonts, 'Исправление N', '-', '-', '(1а)', 84.25);
 
-    const rows = [
-      ['Продавец:', sellerName, '(2)', true],
-      ['Адрес:', this.clean(organization.address) || '-', '(2а)', false],
-      ['ИНН/КПП продавца:', this.innKpp(organization), '(2б)', false],
-      ['Грузоотправитель и его адрес:', 'он же', '(3)', false],
-      ['Грузополучатель и его адрес:', '-', '(4)', false],
-      ['К платежно-расчетному документу №', '', '(5)', false],
-      ['Документ об отгрузке:', this.buildShipmentDocumentLine(invoiceNumber, invoiceDate), '(5а)', false],
-      ['Покупатель:', buyerName, '(6)', true],
-      ['Адрес:', this.clean(client.address) || '-', '(6а)', false],
-      ['ИНН/КПП покупателя:', this.innKpp(client), '(6б)', false],
-      ['Валюта: наименование, код', 'Российский рубль, 643', '(7)', false],
-      ['Идентификатор государственного контракта,\nдоговора (соглашения)(при наличии):', '', '(8)', false]
-    ] as Array<[string, string, string, boolean]>;
+    const drawHeaderLine = (
+      row: [string, string, string, boolean, number],
+      column: { labelX: number; valueX: number; lineRight: number; codeX: number },
+      y: number
+    ) => {
+      const [label, value, code, bold, height] = row;
+      const lineOffset = Math.max(height - 1, 8);
 
-    const yPositions = [94, 103.75, 113.5, 123.25, 133, 142, 151, 160.75, 170.5, 180.25, 190, 207];
-    rows.forEach(([label, value, code, bold], index) => {
-      const y = yPositions[index];
-      this.drawTextBox(doc, fonts, label, labelX, y - 0.5, valueX - labelX - 4, index === rows.length - 1 ? 17 : 9, {
-        size: index === rows.length - 1 ? 5.8 : 6.2,
+      this.drawTextBox(doc, fonts, label, column.labelX, y - 0.5, column.valueX - column.labelX - 4, height, {
+        size: height > 10 ? 5.4 : 6.2,
         bold,
         align: 'left'
       });
-      this.drawHorizontalRule(doc, valueX, lineRight, y + (index === rows.length - 1 ? 9 : 8));
-      this.drawTextBox(doc, fonts, value, valueX, y - 0.5, lineRight - valueX, 9, { size: 6.2 });
-      this.drawTextBox(doc, fonts, code, codeX, y - 0.5, 22, 9, { size: 6.2 });
+      this.drawHorizontalRule(doc, column.valueX, column.lineRight, y + lineOffset);
+      this.drawTextBox(doc, fonts, value, column.valueX, y - 0.5, column.lineRight - column.valueX, height, {
+        size: height > 10 ? 5.7 : 6.2
+      });
+      this.drawTextBox(doc, fonts, code, column.codeX, y - 0.5, 22, 9, { size: 6.2 });
+    };
+
+    const sellerRows = [
+      ['Продавец:', sellerName, '(2)', true, 9],
+      ['Адрес:', this.clean(organization.address) || '-', '(2а)', false, 9],
+      ['ИНН/КПП продавца:', this.innKpp(organization), '(2б)', false, 9],
+      ['Грузоотправитель и его адрес:', 'он же', '(3)', false, 9],
+      ['Грузополучатель и его адрес:', '-', '(4)', false, 9],
+      ['К платежно-расчетному документу №', '', '(5)', false, 9],
+      ['Документ об отгрузке:', this.buildShipmentDocumentLine(invoiceNumber, invoiceDate), '(5а)', false, 9]
+    ] as Array<[string, string, string, boolean, number]>;
+
+    const buyerRows = [
+      ['Покупатель:', buyerName, '(6)', true, 9],
+      ['Адрес:', this.clean(client.address) || '-', '(6а)', false, 16],
+      ['ИНН/КПП покупателя:', this.innKpp(client), '(6б)', false, 9],
+      ['Валюта: наименование, код', 'Российский рубль, 643', '(7)', false, 9],
+      ['Идентификатор государственного контракта,\nдоговора (соглашения) (при наличии):', '', '(8)', false, 24]
+    ] as Array<[string, string, string, boolean, number]>;
+
+    const sellerYPositions = [94, 104, 114, 124, 134, 144, 154];
+    const buyerYPositions = [94, 104, 121, 132, 148];
+
+    sellerRows.forEach((row, index) => drawHeaderLine(row, leftColumn, sellerYPositions[index]));
+    buyerRows.forEach((row, index) => drawHeaderLine(row, rightColumn, buyerYPositions[index]));
+
+    const prepaymentInvoiceLabel =
+      'К счету-фактуре (счетам-фактурам), выставленному (выставленным) при получении оплаты, частичной оплаты или иных\n' +
+      'платежей в счет предстоящих поставок товаров (выполнения работ, оказания услуг), передачи имущественных прав';
+    this.drawTextBox(doc, fonts, prepaymentInvoiceLabel, 96, 184, 700, 18, {
+      size: 5.5,
+      align: 'left'
     });
+    this.drawHorizontalRule(doc, 96, 800, 203);
+    this.drawTextBox(doc, fonts, '(5б)', 800, 194, 22, 9, { size: 6.2 });
 
     return 234.75;
   }
