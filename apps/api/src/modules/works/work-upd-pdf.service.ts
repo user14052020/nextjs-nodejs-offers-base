@@ -677,7 +677,7 @@ export class WorkUpdPdfService {
     this.drawTextBox(doc, fonts, 'от', secondLabelX, y - 1, 12, 9, { size: 6.2, bold: true, align: 'center' });
     this.drawHorizontalRule(doc, secondLineX, 336, lineY);
     this.drawTextBox(doc, fonts, date || '-', secondLineX + 2, y - 1, 73, 9, { size: 6.2, align: 'center' });
-    this.drawTextBox(doc, fonts, code, 800, y - 1, 22, 9, { size: 6.2 });
+    this.drawTextBox(doc, fonts, code, 342, y - 1, 22, 9, { size: 6.2 });
   }
 
   private drawDateLine(
