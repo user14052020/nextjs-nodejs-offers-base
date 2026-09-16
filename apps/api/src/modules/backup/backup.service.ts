@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Binary, Collection, ObjectId } from 'mongodb';
 import { once } from 'node:events';
@@ -26,6 +26,8 @@ const BACKUP_DATE_FIELDS_BY_COLLECTION: Record<string, string[]> = {
 
 @Injectable()
 export class BackupService {
+  private readonly logger = new Logger(BackupService.name);
+
   constructor(
     @InjectConnection() private readonly connection: Connection,
     private readonly searchService: SearchService
@@ -135,7 +137,7 @@ export class BackupService {
       }
     }
 
-    await this.rebuildSearchIndices(restoredByCollection);
+    this.scheduleSearchRebuild(restoredByCollection);
 
     return {
       message: 'Бэкап восстановлен',
@@ -648,6 +650,19 @@ export class BackupService {
     }
 
     return String(error);
+  }
+
+  private scheduleSearchRebuild(restoredByCollection: Map<string, Record<string, unknown>[]>) {
+    const snapshot = new Map<string, Record<string, unknown>[]>(
+      [...restoredByCollection.entries()].map(([collection, documents]): [string, Record<string, unknown>[]] => [
+        collection,
+        documents.map((document) => ({ ...document }))
+      ])
+    );
+
+    void this.rebuildSearchIndices(snapshot).catch((error) => {
+      this.logger.warn(`Не удалось перестроить поисковый индекс после восстановления: ${this.errorMessage(error)}`);
+    });
   }
 
   private async rebuildSearchIndices(restoredByCollection: Map<string, Record<string, unknown>[]>) {

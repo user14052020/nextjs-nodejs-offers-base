@@ -4,11 +4,13 @@ import { Client } from '@elastic/elasticsearch';
 const ORGANIZATIONS_INDEX = 'organizations';
 const CLIENTS_INDEX = 'clients';
 const WORKS_INDEX = 'works';
+const SEARCH_RETRY_DELAY_MS = 60_000;
 
 @Injectable()
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
   private readonly client: Client;
+  private unavailableUntil = 0;
 
   constructor() {
     const node = process.env.ELASTICSEARCH_NODE ?? 'http://elasticsearch:9200';
@@ -267,6 +269,10 @@ export class SearchService implements OnModuleInit {
     fallback?: T,
     options?: { ignoreNotFound?: boolean }
   ): Promise<T> {
+    if (this.isInCooldown()) {
+      return fallback as T;
+    }
+
     try {
       return await fn();
     } catch (error) {
@@ -276,8 +282,17 @@ export class SearchService implements OnModuleInit {
       }
 
       this.logSearchError(operation, error);
+      this.markUnavailable();
       return fallback as T;
     }
+  }
+
+  private isInCooldown() {
+    return Date.now() < this.unavailableUntil;
+  }
+
+  private markUnavailable() {
+    this.unavailableUntil = Date.now() + SEARCH_RETRY_DELAY_MS;
   }
 
   private logSearchError(operation: string, error: unknown) {
