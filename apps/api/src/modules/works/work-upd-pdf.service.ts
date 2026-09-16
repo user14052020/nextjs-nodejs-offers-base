@@ -41,6 +41,8 @@ type WorkLike = {
 
 type TextAlign = 'left' | 'center' | 'right';
 
+const DEFAULT_IP_REGISTRATION_DETAILS = 'ОГРНИП 324665800143783, 02.07.2024 г.';
+
 @Injectable()
 export class WorkUpdPdfService {
   private readonly page = {
@@ -492,7 +494,7 @@ export class WorkUpdPdfService {
     const buyerSigner = this.personShortName(client.signerName) || (client.isPhysicalPerson ? this.personShortName(client.name) : '');
     const basis = this.buildInvoiceBasis(work);
     const [day, month, year] = this.formatUpdDateParts(work.actDate || work.invoiceDate);
-    const registrationDetails = this.clean(organization.registrationDetails);
+    const registrationDetails = this.clean(organization.registrationDetails) || DEFAULT_IP_REGISTRATION_DETAILS;
 
     this.drawVerticalRule(doc, 85.8, 0, 75.8, 1.5);
     this.drawHorizontalRule(doc, 85.8, this.page.right, 75.8, 1.5);
